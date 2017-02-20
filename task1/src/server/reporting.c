@@ -16,14 +16,14 @@ static void printCurrentTime() {
 
 const char *colorEscapeSequence(Color c) {
 	switch (c) {
-		case Red:     return "\x1B[31;1m";
-		case Green:   return "\x1B[32;1m";
-		case Yellow:  return "\x1B[33;1m";
-		case Blue:    return "\x1B[34;1m";
-		case Magenta: return "\x1B[35;1m";
-		case Cyan:    return "\x1B[36;1m";
-		case White:   return "\x1B[37;1m";
-		case None:    return "\x1B[0m";
+		case Red:     return red;
+		case Green:   return green;
+		case Yellow:  return yellow;
+		case Blue:    return blue;
+		case Magenta: return magenta;
+		case Cyan:    return cyan;
+		case White:   return white;
+		case None:    return none;
 	}
 }
 
