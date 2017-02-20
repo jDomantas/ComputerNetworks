@@ -70,7 +70,7 @@ static void executeCommand(Server *server, Client *client, const char *command) 
 	if (isCommand("name", command, &argStart, &argLen)) {
 		if (argLen > MAX_NAME_LENGTH) {
 			displayPrivateMessage(server, client,
-				"Name cannot be longer than %s charactars",
+				"Name cannot be longer than %d charactars",
 				MAX_NAME_LENGTH);
 		} else {
 			char oldName[MAX_NAME_LENGTH];
@@ -83,7 +83,33 @@ static void executeCommand(Server *server, Client *client, const char *command) 
 				client->name,
 				none);
 		}
-	} else {
+	} else if (isCommand("me", command, &argStart, &argLen)) {
+		displayMessage(server, "%s%s %.*s%s",
+			blue,
+			client->name,
+			argLen,
+			argStart,
+			none);
+	}
+	#define colorCommand(colorName, color) \
+		else if (isCommand((colorName), command, &argStart, &argLen)) { \
+			displayMessage(server, "%s%s%s> %s%.*s%s", \
+				yellow, \
+				client->name, \
+				none, \
+				(color), \
+				argLen, \
+				argStart, \
+				none); \
+		}
+	colorCommand("red", red)
+	colorCommand("green", green)
+	colorCommand("blue", blue)
+	colorCommand("cyan", cyan)
+	colorCommand("magenta", magenta)
+	colorCommand("yellow", yellow)
+	#undef colorCommand
+	else {
 		displayPrivateMessage(server, client, "Unknown command");
 	}
 }
