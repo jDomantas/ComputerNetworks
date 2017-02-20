@@ -19,15 +19,35 @@ static void printUsage(const char *name) {
 	exit(1);
 }
 
-static void onClientMessage(Server *server, Client *client, const char *msg) {
-	char buffer[MAX_MESSAGE_LENGTH + MAX_NAME_LENGTH + 2];
-	strcpy(buffer, client->name);
-	size_t writePos = strlen(client->name);
-	buffer[writePos++] = '>';
-	buffer[writePos++] = ' ';
-	strcpy(buffer + writePos, msg);
+static void onMessage(Server *server, Client *client, const char *msg) {
+	char buffer[MAX_MESSAGE_LENGTH + MAX_NAME_LENGTH + 20];
+	sprintf(buffer, "%s%s>%s %s",
+		colorEscapeSequence(Yellow),
+		client->name,
+		colorEscapeSequence(None),
+		msg);
 	sendToAll(server, buffer);
 	printMessage("%s", buffer);
+}
+
+static void onConnected(Server *server, Client *client) {
+	printColoredMessage(Yellow, "%s connected", client->name);
+	char msg[MAX_NAME_LENGTH + 50];
+	sprintf(msg, "%s%s connected%s",
+		colorEscapeSequence(Yellow),
+		client->name,
+		colorEscapeSequence(None));
+	sendToAll(server, msg);
+}
+
+static void onDisconnected(Server *server, Client *client) {
+	printColoredMessage(Yellow, "%s disconnected", client->name);
+	char msg[MAX_NAME_LENGTH + 50];
+	sprintf(msg, "%s%s disconnected%s",
+		colorEscapeSequence(Yellow),
+		client->name,
+		colorEscapeSequence(None));
+	sendToAll(server, msg);
 }
 
 int main(int argc, const char **argv) {
@@ -40,7 +60,9 @@ int main(int argc, const char **argv) {
 		reportError("Invalid port, must be a number in range 1 - 65535", false);
 	}
 
-	Server server = createServer((uint16_t)port, &onClientMessage);
+	ServerCallbacks callbacks = { &onMessage, &onConnected, &onDisconnected };
+
+	Server server = createServer((uint16_t)port, callbacks);
 
 	printMessage("Started server, listening on port %d", port);
 	

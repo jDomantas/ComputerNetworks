@@ -1,10 +1,10 @@
 #include <stdio.h>
-#include <ncurses.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include "network.h"
 #include "reporting.h"
+#include "screen.h"
 
 static bool parseLong(const char *input, long *result) {
 	char *ep;
@@ -19,22 +19,22 @@ static void printUsage(const char *name) {
 }
 
 void onMessage(Client *client, const char *msg) {
-	printf("Received: %s\n", msg);
+	addLine(msg);
 }
 
 int main(int argc, char **argv) {
-	/*initscr();
-	noecho();
-	curs_set(FALSE);
-
-	for (int i = 0; i < 5; i++) {
-		clear();
-		mvprintw(i, 0, "\x1B[31;1m" "Hello, world!" "\x1B[0m");
-		refresh();
-		usleep(500000);
+	/*argv[0][0] = (char)argc;
+	initScreen();
+	//usleep(1000000);
+	addLine("Heeeee");
+	addLine("Wooo");
+	addLine("I am a veeeeeeeeeeeee\x1B[31;1meeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\x1B[0meeeeeeeeery looooooooooong line");
+	while (true) {
+		screenTick();
 	}
-
-	endwin();*/
+	usleep(1000000);
+	closeScreen();
+	return 0;*/
 	
 	if (argc != 3) {
 		printUsage(argv[0]);
@@ -47,22 +47,26 @@ int main(int argc, char **argv) {
 
 	Client client = createClient(argv[1], (uint16_t)port, &onMessage);
 
-	puts("connected");
-	
-	sendMessage(&client, "I am a big boy");
-	
-	sendMessage(&client, "I am a bigger boy");
+	initScreen();
+	addLine("Connected to server");
 	
 	while (client.state == Connected) {
+		const char *input = getInput();
+		if (input != NULL) {
+			sendMessage(&client, input);
+		}
+
 		clientTick(&client);
 	}
-	
+
+	closeScreen();
+
 	if (client.state == LostConnection) {
 		puts("Lost connection");
 	} else if (client.state == Error) {
 		puts("Error occured");
 	}
-	
+
 	return 0;
 }
 

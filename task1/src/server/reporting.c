@@ -14,7 +14,7 @@ static void printCurrentTime() {
 	printf("[%s] ", formattedTime);
 }
 
-static const char *colorEscapeSequence(Color c) {
+const char *colorEscapeSequence(Color c) {
 	switch (c) {
 		case Red:     return "\x1B[31;1m";
 		case Green:   return "\x1B[32;1m";
@@ -23,6 +23,7 @@ static const char *colorEscapeSequence(Color c) {
 		case Magenta: return "\x1B[35;1m";
 		case Cyan:    return "\x1B[36;1m";
 		case White:   return "\x1B[37;1m";
+		case None:    return "\x1B[0m";
 	}
 }
 
@@ -52,6 +53,6 @@ void printColoredMessage(Color color, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	vprintf(format, args);
-	puts("\x1B[0m");
+	puts(colorEscapeSequence(None));
 	va_end(args);
 }

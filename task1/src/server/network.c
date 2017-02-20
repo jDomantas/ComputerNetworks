@@ -5,11 +5,11 @@
 #include "reporting.h"
 #include "network.h"
 
-Server createServer(uint16_t port, ClientMessageCallback callback) {
+Server createServer(uint16_t port, ServerCallbacks callbacks) {
 	Server server;
 	
 	server.port = port;
-	server.callback = callback;
+	server.callbacks = callbacks;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 		server.clients[i].isConnected = false;
 	}
@@ -63,11 +63,17 @@ static void acceptClient(Server *server) {
 	c->lastPingTime = time(NULL);
 	c->nextMessageLength = 0;
 	strcpy(c->name, "User");
+	
+	if (server->callbacks.clientConnected) {
+		server->callbacks.clientConnected(server, c);
+	}
 }
 
 static void clientDisconnected(Server *server, Client *client) {
-	printColoredMessage(Yellow, "%s disconnected", client->name);
 	client->isConnected = false;
+	if (server->callbacks.clientDisconnected) {
+		server->callbacks.clientDisconnected(server, client);
+	}
 }
 
 static void readClientMessage(Server *server, Client *client) {
@@ -106,10 +112,8 @@ static void readClientMessage(Server *server, Client *client) {
 				message[client->nextMessageLength] = 0;
 				client->nextMessageLength = 0;
 				// and execute callback with client message
-				if (server->callback != NULL) {
-					server->callback(server, client, message);
-				} else {
-					printMessage("%s> %s", client->name, message);
+				if (server->callbacks.onMessage != NULL) {
+					server->callbacks.onMessage(server, client, message);
 				}
 			}
 		}

@@ -19,17 +19,24 @@ typedef struct {
 
 struct Server;
 
-typedef void (*ClientMessageCallback)(struct Server*, Client*, const char*);
+typedef void (*MessageCallback)(struct Server*, Client*, const char*);
+typedef void (*UpdateCallback)(struct Server*, Client*);
+
+typedef struct {
+	MessageCallback onMessage;
+	UpdateCallback clientConnected;
+	UpdateCallback clientDisconnected;
+} ServerCallbacks;
 
 typedef struct Server {
 	int port;
 	int socket;
 	struct sockaddr_in address;
 	Client clients[MAX_CLIENTS];
-	ClientMessageCallback callback;
+	ServerCallbacks callbacks;
 } Server;
 
-Server createServer(uint16_t port, ClientMessageCallback callback);
+Server createServer(uint16_t port, ServerCallbacks callbacks);
 void sendMessage(Server *server, Client *client, const char *msg);
 void sendToAll(Server *server, const char *msg);
 void serverTick(Server *server);
