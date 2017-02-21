@@ -2,6 +2,7 @@
 #define REPORTING_H
 
 #include <stdbool.h>
+#include <stdarg.h>
 
 typedef enum {
 	Red,
