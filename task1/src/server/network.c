@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "reporting.h"
 #include "network.h"
 
@@ -70,10 +71,19 @@ static void acceptClient(Server *server) {
 }
 
 static void clientDisconnected(Server *server, Client *client) {
+	if (!client->isConnected) {
+		return;
+	}
+	
 	client->isConnected = false;
 	if (server->callbacks.clientDisconnected) {
 		server->callbacks.clientDisconnected(server, client);
 	}
+}
+
+static void disconnectClient(Server *server, Client *client) {
+	close(client->socket);
+	clientDisconnected(server, client);
 }
 
 static void readClientMessage(Server *server, Client *client) {
@@ -96,8 +106,11 @@ static void readClientMessage(Server *server, Client *client) {
 		}
 	} else {
 		if (client->nextMessageLength > MAX_MESSAGE_LENGTH) {
-			// client is evil because he tries to send too long messages, what to do?
-			printColoredMessage(Red, "Client is evil, message length: %zd", client->nextMessageLength);
+			printColoredMessage(Red,
+				"Client '%s' is evil, message length: %zd",
+				client->name,
+				client->nextMessageLength);
+			disconnectClient(server, client);
 		} else {
 			char message[MAX_MESSAGE_LENGTH + 1];
 			ssize_t bytesRead = recv(client->socket, message, client->nextMessageLength, MSG_PEEK);
