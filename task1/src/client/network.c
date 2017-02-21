@@ -26,8 +26,6 @@ Client createClient(const char *address, uint16_t port, MessageCallback callback
 	client.serverAddress.sin_port = htons(port); // port
 	
 	// parse and set server address
-	// clang complains that it cannot find inet_aton
-	// but the binary still compiles...  :( ??
 	if (inet_aton(address, &client.serverAddress.sin_addr) <= 0) {
 		reportError("Invalid remote IP address", true);
 	}
