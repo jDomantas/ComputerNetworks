@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use bencode::BValue;
+use bencode::{BValue, encode};
 
 pub struct Torrent {
 	pub tracker_url: String,
@@ -34,7 +34,7 @@ pub enum DecodeError {
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
 
-pub fn from_bvalue(value: BValue) -> DecodeResult<Torrent> {
+pub fn from_bvalue(value: BValue) -> DecodeResult<(Torrent, [u8; 20])> {
 	let mut dict = try!(value.get_dict().ok_or(DecodeError::MissingTracker));
 
 	let tracker = try!(dict
@@ -43,18 +43,26 @@ pub fn from_bvalue(value: BValue) -> DecodeResult<Torrent> {
 		.ok_or(DecodeError::MissingTracker)
 		.and_then(decode_string));
 
-	let info = try!(dict
+	let (info, hash) = try!(dict
 		.remove(&b"info"[..])
 		.ok_or(DecodeError::MissingInfo)
 		.and_then(decode_info));
 
-	Ok(Torrent {
+	Ok((Torrent {
 		tracker_url: tracker,
 		info: info,
-	})
+	}, hash))
 }
 
-fn decode_info(value: BValue) -> DecodeResult<TorrentInfo> {
+fn hash_info(value: &BValue) -> [u8; 20] {
+	let encoded = encode(value);
+	let mut hasher = ::sha1::Sha1::new();
+	hasher.update(&encoded);
+	hasher.digest().bytes()
+}
+
+fn decode_info(value: BValue) -> DecodeResult<(TorrentInfo, [u8; 20])> {
+	let hash = hash_info(&value);
 	let mut dict = try!(value.get_dict().ok_or(DecodeError::MissingName));
 
 	let name = try!(dict
@@ -101,12 +109,12 @@ fn decode_info(value: BValue) -> DecodeResult<TorrentInfo> {
 		}
 	};
 
-	Ok(TorrentInfo {
+	Ok((TorrentInfo {
 		root: name,
 		piece_length: piece_length,
 		pieces: pieces,
 		files: files,
-	})
+	}, hash))
 }
 
 fn decode_file(value: BValue) -> DecodeResult<File> {
