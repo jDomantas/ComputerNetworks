@@ -2,12 +2,13 @@ use ::std::io::Read;
 use ::hyper::client::{Client, IntoUrl};
 use ::hyper::status::StatusCode;
 use ::hyper::Url;
+use ::std::time::{Instant, Duration};
 use bencode::*;
 
 
-pub trait Tracker where Self: ::std::marker::Sized {
+pub trait Tracker {
 	fn new(args: TrackerArgs) -> Self;
-	fn send_request(&mut self, down: u64, up: u64, left: u64);
+	fn update_tracker(&mut self, down: u64, up: u64, left: u64);
 	fn latest_response(&mut self) -> Option<Response>;
 }
 
@@ -28,6 +29,7 @@ pub struct HttpTracker {
 	args: TrackerArgs,
 	sent_started: bool,
 	latest_response: Option<Response>,
+	no_requests_before: Instant,
 }
 
 impl Tracker for HttpTracker {
@@ -38,10 +40,17 @@ impl Tracker for HttpTracker {
 			args: args,
 			sent_started: false,
 			latest_response: None,
+			no_requests_before: Instant::now(),
 		}
 	}
 
-	fn send_request(&mut self, down: u64, up: u64, left: u64) {
+	fn update_tracker(&mut self, down: u64, up: u64, left: u64) {
+		if self.can_send_request() {
+			let retry_interval = Duration::new(10, 0);
+			self.no_requests_before = Instant::now() + retry_interval;
+		} else {
+			return;
+		}
 		let url = self.build_request(down, up, left);
 		let response = self.client.get(url).send();
 		match response {
@@ -54,7 +63,7 @@ impl Tracker for HttpTracker {
 				}
 			}
 			Err(error) => {
-				println!("Tracker request failed: {}", error);
+				println!("Tracker request failed.\n  {}", error);
 			}
 		}
 	}
@@ -65,6 +74,10 @@ impl Tracker for HttpTracker {
 }
 
 impl HttpTracker {
+	fn can_send_request(&self) -> bool {
+		Instant::now() >= self.no_requests_before
+	}
+
 	fn process_tracker_response(&mut self, mut response: ::hyper::client::Response) {
 		let mut body = Vec::new();
 		match response.read_to_end(&mut body) {
@@ -100,6 +113,8 @@ impl HttpTracker {
 				ip & 0xFF,
 				port);
 		}
+		let to_next_request = Duration::new(response.query_interval, 0);
+		self.no_requests_before = Instant::now() + to_next_request;
 		self.latest_response = Some(response);
 	}
 

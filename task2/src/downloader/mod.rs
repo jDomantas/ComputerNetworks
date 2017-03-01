@@ -36,6 +36,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 
 	pub fn run(&mut self) {
 		println!("Running downloader to death!");
+		self.tracker.update_tracker(0, 0, self.storage.bytes_missing());
 		unimplemented!()
 	}
 }
