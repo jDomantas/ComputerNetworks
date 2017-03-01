@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 #[derive(Debug, Eq, PartialEq)]
 pub enum BValue {
 	Int(i64),
-	Str(String),
+	Str(Vec<u8>),
 	List(Vec<BValue>),
-	Dict(BTreeMap<String, BValue>),
+	Dict(BTreeMap<Vec<u8>, BValue>),
 }
 
 macro_rules! bdict {
 	( $( $k:expr => $v:expr ),* ) => {{
-		let mut m: ::std::collections::BTreeMap<String, BValue> =
+		let mut m: ::std::collections::BTreeMap<Vec<u8>, BValue> =
 			::std::collections::BTreeMap::new();
 		$(
 			m.insert($k, $v);
@@ -31,7 +31,6 @@ macro_rules! blist {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DecodeError {
-	UTF8DecodeError,
 	BadFormat,
 	NumberTooLarge,
 	EarlyEndOfInput,
@@ -105,12 +104,10 @@ impl Encoder {
 		self.write_char('e');
 	}
 
-	fn write_string(&mut self, s: &str) {
-		let bytes = s.as_bytes();
-		let length = bytes.len();
-		self.write_raw_number(length as u64);
+	fn write_string(&mut self, s: &[u8]) {
+		self.write_raw_number(s.len() as u64);
 		self.write_char(':');
-		self.write_bytes(bytes);
+		self.write_bytes(s);
 	}
 
 	fn write_list(&mut self, list: &[BValue]) {
@@ -121,7 +118,7 @@ impl Encoder {
 		self.write_char('e');
 	}
 
-	fn write_dict(&mut self, dict: &BTreeMap<String, BValue>) {
+	fn write_dict(&mut self, dict: &BTreeMap<Vec<u8>, BValue>) {
 		self.write_char('d');
 		for (key, value) in dict {
 			self.write_string(key);
@@ -248,11 +245,10 @@ impl<'a> Decoder<'a> {
 		}
 	}
 
-	fn read_string(&mut self) -> DecodeResult<String> {
+	fn read_string(&mut self) -> DecodeResult<Vec<u8>> {
 		let byte_count = try!(self.read_raw_number(':' as u8));
 		let bytes = try!(self.read_bytes(byte_count as usize)).to_vec();
-		String::from_utf8(bytes)
-			.map_err(|_| DecodeError::UTF8DecodeError)
+		Ok(bytes)
 	}
 
 	fn read_list(&mut self) -> DecodeResult<BValue> {
@@ -281,8 +277,8 @@ impl<'a> Decoder<'a> {
 mod test {
 	use super::BValue;
 
-	pub fn bstr(literal: &'static str) -> BValue {
-		BValue::Str(literal.to_owned())
+	pub fn bstr(literal: &[u8]) -> BValue {
+		BValue::Str(literal.to_vec())
 	}
 
 	mod encoding {
@@ -311,13 +307,13 @@ mod test {
 
 		#[test]
 		fn string() {
-			check_encode(bstr("Hello!"), b"6:Hello!");
+			check_encode(bstr(b"Hello!"), b"6:Hello!");
 		}
 		
 		#[test]
 		fn list() {
 			check_encode(
-				blist![BValue::Int(42), bstr("abc")],
+				blist![BValue::Int(42), bstr(b"abc")],
 				b"li42e3:abce");
 		}
 
@@ -325,8 +321,8 @@ mod test {
 		fn dict() {
 			check_encode(
 				bdict!(
-					"baz".to_owned() => BValue::Int(-9),
-					"foo".to_owned() => bstr("bar")
+					b"baz".to_vec() => BValue::Int(-9),
+					b"foo".to_vec() => bstr(b"bar")
 				),
 				b"d3:bazi-9e3:foo3:bare");
 		}
@@ -335,11 +331,11 @@ mod test {
 		fn nested() {
 			check_encode(
 				bdict![
-					"baz".to_owned() => BValue::Int(-9),
-					"foo".to_owned() => bstr("bar"),
-					"nest!".to_owned() => bdict!(
-						"baaaar".to_owned() => bdict!("?".to_owned() => bstr("!")),
-						"fooooo".to_owned() => blist![BValue::Int(123456789)]
+					b"baz".to_vec() => BValue::Int(-9),
+					b"foo".to_vec() => bstr(b"bar"),
+					b"nest!".to_vec() => bdict!(
+						b"baaaar".to_vec() => bdict!(b"?".to_vec() => bstr(b"!")),
+						b"fooooo".to_vec() => blist![BValue::Int(123456789)]
 					)
 				],
 				b"d3:bazi-9e3:foo3:bar5:nest!d6:baaaard1:?1:!e6:foooooli123456789eeee");
@@ -372,13 +368,13 @@ mod test {
 
 		#[test]
 		fn string() {
-			check_decode(bstr("Hello!"), b"6:Hello!");
+			check_decode(bstr(b"Hello!"), b"6:Hello!");
 		}
 		
 		#[test]
 		fn list() {
 			check_decode(
-				blist![BValue::Int(42), bstr("abc")],
+				blist![BValue::Int(42), bstr(b"abc")],
 				b"li42e3:abce");
 		}
 
@@ -386,8 +382,8 @@ mod test {
 		fn dict() {
 			check_decode(
 				bdict![
-					"baz".to_owned() => BValue::Int(-9),
-					"foo".to_owned() => bstr("bar")
+					b"baz".to_vec() => BValue::Int(-9),
+					b"foo".to_vec() => bstr(b"bar")
 				],
 				b"d3:bazi-9e3:foo3:bare");
 		}
@@ -396,11 +392,11 @@ mod test {
 		fn nested() {
 			check_decode(
 				bdict![
-					"baz".to_owned() => BValue::Int(-9),
-					"foo".to_owned() => bstr("bar"),
-					"nest!".to_owned() => bdict!(
-						"baaaar".to_owned() => bdict!("?".to_owned() => bstr("!")),
-						"fooooo".to_owned() => blist![BValue::Int(123456789)]
+					b"baz".to_vec() => BValue::Int(-9),
+					b"foo".to_vec() => bstr(b"bar"),
+					b"nest!".to_vec() => bdict!(
+						b"baaaar".to_vec() => bdict!(b"?".to_vec() => bstr(b"!")),
+						b"fooooo".to_vec() => blist![BValue::Int(123456789)]
 					)
 				],
 				b"d3:bazi-9e3:foo3:bar5:nest!d6:baaaard1:?1:!e6:foooooli123456789eeee");
