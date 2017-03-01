@@ -8,6 +8,57 @@ pub enum BValue {
 	Dict(BTreeMap<Vec<u8>, BValue>),
 }
 
+impl BValue {
+	pub fn get_int(&self) -> Option<i64> {
+		match self {
+			&BValue::Int(x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_string(self) -> Option<Vec<u8>> {
+		match self {
+			BValue::Str(x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_list(self) -> Option<Vec<BValue>> {
+		match self {
+			BValue::List(x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_dict(self) -> Option<BTreeMap<Vec<u8>, BValue>> {
+		match self {
+			BValue::Dict(x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_string_ref(&self) -> Option<&[u8]> {
+		match self {
+			&BValue::Str(ref x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_list_ref(&self) -> Option<&[BValue]> {
+		match self {
+			&BValue::List(ref x) => Some(x),
+			_ => None,
+		}
+	}
+
+	pub fn get_dict_ref(&self) -> Option<&BTreeMap<Vec<u8>, BValue>> {
+		match self {
+			&BValue::Dict(ref x) => Some(x),
+			_ => None,
+		}
+	}
+}
+
 macro_rules! bdict {
 	( $( $k:expr => $v:expr ),* ) => {{
 		let mut m: ::std::collections::BTreeMap<Vec<u8>, BValue> =
