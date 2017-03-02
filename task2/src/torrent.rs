@@ -29,6 +29,7 @@ pub enum DecodeError {
 	BadPieceLength,
 	BadPieces,
 	BadFile,
+	BadFilePath,
 	UTF8Error,
 }
 
@@ -122,9 +123,9 @@ fn decode_file(value: BValue) -> DecodeResult<File> {
 
 	let path = try!(dict
 		.remove(&b"path"[..])
-		.and_then(BValue::get_string)
+		.and_then(BValue::get_list)
 		.ok_or(DecodeError::BadFile)
-		.and_then(decode_string)
+		.and_then(decode_path)
 		.map(PathBuf::from));
 
 	let length = try!(dict
@@ -141,6 +142,20 @@ fn decode_file(value: BValue) -> DecodeResult<File> {
 
 fn decode_string(bytes: Vec<u8>) -> DecodeResult<String> {
 	String::from_utf8(bytes).map_err(|_| DecodeError::UTF8Error)
+}
+
+fn decode_path(segments: Vec<BValue>) -> DecodeResult<PathBuf> {
+	let mut path = PathBuf::new();
+	for segment in segments.into_iter() {
+		let segment = try!(segment
+			.get_string()
+			.ok_or(DecodeError::BadFilePath)
+			.and_then(|s| decode_string(s))
+			.map_err(|_| DecodeError::BadFilePath));
+		let segment = PathBuf::from(segment);
+		path.push(segment);
+	}
+	Ok(path)
 }
 
 fn int_to_unsigned(i: i64) -> Option<u64> {
