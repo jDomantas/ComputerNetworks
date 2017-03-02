@@ -20,8 +20,8 @@ pub struct TrackerArgs {
 }
 
 pub struct Response {
-	query_interval: u64,
-	peers: Vec<(u32, u16)>,
+	pub query_interval: u64,
+	pub peers: Vec<(u32, u16)>,
 }
 
 pub struct HttpTracker {
@@ -105,14 +105,6 @@ impl HttpTracker {
 	}
 
 	fn store_response(&mut self, response: Response) {
-		for &(ip, port) in &response.peers {
-			println!("peer at: {}.{}.{}.{}:{}",
-				(ip >> 24) & 0xFF,
-				(ip >> 16) & 0xFF,
-				(ip >> 8) & 0xFF,
-				ip & 0xFF,
-				port);
-		}
 		let to_next_request = Duration::new(response.query_interval, 0);
 		self.no_requests_before = Instant::now() + to_next_request;
 		self.latest_response = Some(response);

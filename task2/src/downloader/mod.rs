@@ -1,14 +1,19 @@
 pub mod tracker;
+pub mod connection;
 
 use std::path::PathBuf;
 use torrent::Torrent;
 use storage::Storage;
-use downloader::tracker::{Tracker, TrackerArgs};
+use self::tracker::{Tracker, TrackerArgs};
+use self::connection::Connection;
 
 
 pub struct Downloader<S: Storage, T: Tracker> {
 	storage: S,
 	tracker: T,
+	connections: Vec<Connection>,
+	known_peers: Vec<(u32, u16)>,
+	downloaded: u64,
 	id: String,
 	info_hash: [u8; 20],
 	port: u16,
@@ -28,6 +33,9 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		Downloader {
 			storage: storage,
 			tracker: tracker,
+			connections: Vec::new(),
+			known_peers: Vec::new(),
+			downloaded: 0,
 			id: id,
 			port: port,
 			info_hash: info_hash,
@@ -35,9 +43,61 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	pub fn run(&mut self) {
-		println!("Running downloader to death!");
-		self.tracker.update_tracker(0, 0, self.storage.bytes_missing());
-		unimplemented!()
+		println!("Running downloader");
+		while self.storage.bytes_missing() > 0 {
+			self.update_tracker();
+			self.remove_dead_connections();
+			self.check_for_new_peers();
+			self.open_new_connections();
+			// TODO: process messages
+			let sleep = ::std::time::Duration::from_secs(5);
+			::std::thread::sleep(sleep);
+		}
+		println!("Download complete");
+	}
+
+	fn update_tracker(&mut self) {
+		let down = self.downloaded;
+		let up = 0; // :(
+		let left = self.storage.bytes_missing();
+		self.tracker.update_tracker(down, up, left);
+	}
+
+	fn remove_dead_connections(&mut self) {
+		self.connections.retain(|con| !con.is_dead());
+	}
+
+	fn open_new_connections(&mut self) {
+		while self.connections.len() == 0 {
+			match self.pick_peer() {
+				Some((ip, port)) => {
+					let con = Connection::new(ip, port);
+					self.connections.push(con);
+				}
+				None => {
+					// no known peers, don't try to loop here
+					break;
+				}
+			}
+		}
+	}
+
+	fn pick_peer(&self) -> Option<(u32, u16)> {
+		if self.known_peers.len() == 0 {
+			None
+		} else {
+			let index = ::rand::random::<usize>() % self.known_peers.len();
+			Some(self.known_peers[index])
+		}
+	}
+
+	fn check_for_new_peers(&mut self) {
+		match self.tracker.latest_response() {
+			Some(response) => {
+				self.known_peers = response.peers;
+			}
+			None => { }
+		}
 	}
 }
 
