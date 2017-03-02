@@ -11,9 +11,9 @@ pub enum Message {
 	Bitfield(Vec<u8>),
 	Request(u32, u32, u32),
 	Piece(u32, u32, Vec<u8>),
+	Cancel(u32, u32, u32),
 	Dead,
 }
-
 
 pub struct Connection {
 	sender: Sender<Message>,
@@ -101,6 +101,8 @@ struct ConnectionInternal {
 	stream: TcpStream,
 	peer_name: String,
 	next_message: Vec<u8>,
+	interested: bool,
+	chocked: bool,
 }
 
 impl ConnectionInternal {
@@ -119,6 +121,8 @@ impl ConnectionInternal {
 			stream: stream,
 			peer_name: name,
 			next_message: Vec::new(),
+			interested: false,
+			chocked: true,
 		})
 	}
 
@@ -333,8 +337,44 @@ impl ConnectionInternal {
 
 		loop {
 			match try!(self.get_raw_message()) {
-				Some(_) => {
-					unimplemented!()
+				Some(RawMessage::KeepAlive) => {
+					println!("Got KeepAlive from {}", self.name);
+				}
+				Some(RawMessage::Choke) => {
+					println!("{} is chocked", self.name);
+					self.chocked = true;
+				}
+				Some(RawMessage::Unchoke) => {
+					println!("{} is not chocked", self.name);
+					self.chocked = false;
+				}
+				Some(RawMessage::Interested) => {
+					println!("{} is interested", self.name);
+					self.interested = true;
+				}
+				Some(RawMessage::NotInterested) => {
+					println!("{} is not interested", self.name);
+					self.interested = false;
+				}
+				Some(RawMessage::Have(piece)) => {
+					println!("{} has piece #{}", self.name, piece);
+					self.send(Message::Have(piece));
+				}
+				Some(RawMessage::Bitfield(bits)) => {
+					println!("{} sent bitfield (length: {})", self.name, bits.len() * 8);
+					self.send(Message::Bitfield(bits));
+				}
+				Some(RawMessage::Request(piece, offset, len)) => {
+					println!("{} wants piece #{}, off: {}, len: {}", self.name, piece, offset, len);
+					self.send(Message::Request(piece, offset, len));
+				}
+				Some(RawMessage::Piece(piece, offset, bytes)) => {
+					println!("{} sent piece #{}, off: {}, len: {}", self.name, piece, offset, bytes);
+					self.send(Message::Piece(piece, offset, bytes));
+				}
+				Some(RawMessage::Cancel(piece, offset, len)) => {
+					println!("{} canceled request for piece #{}, off: {}, len: {}", self.name, piece, offset, len);
+					self.send(Message::Cancel(piece, offset, len));
 				}
 				None => { }
 			}
@@ -354,6 +394,9 @@ impl ConnectionInternal {
 				}
 				Some(Message::Request(index, offset, len)) => {
 					try!(self.write_message(RawMessage::Request(index, offset, len)));
+				}
+				Some(Message::Cancel(index, offset, len)) => {
+					try!(self.write_message(RawMessage::Cancel(index, offset, len)));
 				}
 				None => { }
 			}
