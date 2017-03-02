@@ -414,7 +414,7 @@ impl ConnectionInternal {
 			if checks > 50 {
 				return Err(ConnectionError::NoHandshake);
 			}
-			thread::sleep_ms(500);
+			thread::sleep(Duration::from_millis(500));
 		}
 
 		loop {
