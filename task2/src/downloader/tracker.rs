@@ -4,6 +4,7 @@ use ::hyper::status::StatusCode;
 use ::hyper::Url;
 use ::std::time::{Instant, Duration};
 use bencode::*;
+use downloader::DownloaderId;
 
 
 pub trait Tracker {
@@ -15,7 +16,7 @@ pub trait Tracker {
 pub struct TrackerArgs {
 	pub tracker_url: String,
 	pub info_hash: [u8; 20],
-	pub id: String,
+	pub id: DownloaderId,
 	pub port: u16,
 }
 
@@ -125,7 +126,10 @@ impl HttpTracker {
 			url.push(nibble_to_char(byte >> 4));
 			url.push(nibble_to_char(byte & 0xF));
 		}
-		push_url_arg(&mut url, "peer_id", &self.args.id);
+		push_url_arg(&mut url, "peer_id", "");
+		for &byte in &self.args.id.0 {
+			url.push(byte as char);
+		}
 		push_url_arg(&mut url, "port", &self.args.port.to_string());
 		push_url_arg(&mut url, "uploaded", &up.to_string());
 		push_url_arg(&mut url, "downloaded", &down.to_string());

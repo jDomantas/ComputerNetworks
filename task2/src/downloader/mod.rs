@@ -8,13 +8,16 @@ use self::tracker::{Tracker, TrackerArgs};
 use self::connection::Connection;
 
 
+#[derive(Clone)]
+pub struct DownloaderId(pub [u8; 20]);
+
 pub struct Downloader<S: Storage, T: Tracker> {
 	storage: S,
 	tracker: T,
 	connections: Vec<Connection>,
 	known_peers: Vec<(u32, u16)>,
 	downloaded: u64,
-	id: String,
+	id: DownloaderId,
 	info_hash: [u8; 20],
 	port: u16,
 }
@@ -71,7 +74,11 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		while self.connections.len() == 0 {
 			match self.pick_peer() {
 				Some((ip, port)) => {
-					let con = Connection::new(ip, port);
+					let con = Connection::new(
+						self.id.clone(),
+						self.info_hash.clone(),
+						ip,
+						port);
 					self.connections.push(con);
 				}
 				None => {
@@ -101,12 +108,12 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 }
 
-fn generate_id() -> String {
-	let mut id = "-DJ0001-".to_string();
-	while id.len() < 20 {
+fn generate_id() -> DownloaderId {
+	let mut id: [u8; 20] = *b"-DJ0001-????????????";
+	for i in 8..20 {
 		let digit: u8 = (::rand::random::<u64>() % 10) as u8;
 		let ch = '0' as u8 + digit;
-		id.push(ch as char);
+		id[i] = ch;
 	}
-	id
+	DownloaderId(id)
 }

@@ -5,6 +5,7 @@ use std::thread;
 use std::time::Duration;
 use std::io;
 use std::io::{Read, Write, ErrorKind};
+use downloader::DownloaderId;
 
 
 pub enum Message {
@@ -24,25 +25,29 @@ pub struct Connection {
 }
 
 impl Connection {
-	pub fn new(ip: u32, port: u16) -> Connection {
+	pub fn new(id: DownloaderId, info_hash: [u8; 20], ip: u32, port: u16) -> Connection {
 		let (send1, receive1) = mpsc::channel();
 		let (send2, receive2) = mpsc::channel();
 		let ip = Ipv4Addr::from(ip);
 		let name = format!("{}:{}", ip, port);
+		let params = ConnParams {
+			sender: send1,
+			receiver: receive2,
+			name: name.clone(),
+			info_hash: info_hash,
+			id: id,
+			ip: ip,
+			port: port,
+		};
 		let thread = thread::spawn(move || {
-			let mut con = match ConnectionInternal::new(send1, receive2, ip, port) {
-				Ok(con) => con,
-				Err(e) => {
-					let description = e.description();
-					println!("Connection to {} closed:\n  {}", name, description);
-					return;
-				}
-			};
-			match con.run() {
+			let result = ConnectionInternal::new(params)
+				.and_then(|mut conn| conn.run());
+			match result {
 				Ok(()) => { }
 				Err(e) => {
-					let description = e.description();
-					println!("Connection to {} died:\n  {}", name, description);
+					let descr = e.description();
+					println!("Connection to {} closed:\n  {}", name, descr);
+					return;
 				}
 			}
 		});
@@ -97,6 +102,8 @@ pub enum ConnectionError {
 	ConnectionClosed,
 	ReadError(io::Error),
 	WriteError(io::Error),
+	BadHandshake,
+	NoHandshake,
 }
 
 pub type Result<T> = ::std::result::Result<T, ConnectionError>;
@@ -114,6 +121,16 @@ enum RawMessage {
 	Cancel(u32, u32, u32),
 }
 
+struct ConnParams {
+	sender: Sender<Message>,
+	receiver: Receiver<Message>,
+	id: DownloaderId,
+	info_hash: [u8; 20],
+	name: String,
+	ip: Ipv4Addr,
+	port: u16,
+}
+
 struct ConnectionInternal {
 	sender: Sender<Message>,
 	receiver: Receiver<Message>,
@@ -122,25 +139,26 @@ struct ConnectionInternal {
 	next_message: Vec<u8>,
 	interested: bool,
 	chocked: bool,
+	info_hash: [u8; 20],
+	id: DownloaderId,
 }
 
 impl ConnectionInternal {
-	fn new(send: Sender<Message>, recv: Receiver<Message>, ip: Ipv4Addr, port: u16)
-			-> Result<ConnectionInternal> {
-
-		let name = format!("{}:{}", ip, port);
-		println!("Connecting to peer {}", name);
-		let stream = try!(TcpStream::connect((ip, port))
+	fn new(params: ConnParams) -> Result<ConnectionInternal> {
+		println!("Connecting to peer {}", params.name);
+		let stream = try!(TcpStream::connect((params.ip, params.port))
 			.map_err(ConnectionError::FailedToConnect));
-		println!("Connected to {}", name);
+		println!("Connected to {}", params.name);
 		Ok(ConnectionInternal {
-			sender: send,
-			receiver: recv,
+			sender: params.sender,
+			receiver: params.receiver,
 			stream: stream,
-			peer_name: name,
+			peer_name: params.name,
 			next_message: Vec::new(),
 			interested: false,
 			chocked: true,
+			id: params.id,
+			info_hash: params.info_hash,
 		})
 	}
 
@@ -244,21 +262,26 @@ impl ConnectionInternal {
 		}
 	}
 
-	fn get_raw_message(&mut self) -> Result<Option<RawMessage>> {
+	fn receive_bytes(&mut self) -> Result<()> {
 		match self.stream.read_to_end(&mut self.next_message) {
 			Ok(_) => {
-				// connection was closed?
-				return Err(ConnectionError::ConnectionClosed);
+				// connection was closed
+				Err(ConnectionError::ConnectionClosed)
 			}
 			Err(ref e) if
 				e.kind() == ErrorKind::TimedOut ||
 				e.kind() == ErrorKind::WouldBlock => {
 				// read timed out, everything is fine
+				Ok(())
 			}
 			Err(e) => {
-				return Err(ConnectionError::ReadError(e));
+				Err(ConnectionError::ReadError(e))
 			}
 		}
+	}
+
+	fn get_raw_message(&mut self) -> Result<Option<RawMessage>> {
+		try!(self.receive_bytes());
 		
 		let len = match self.next_message_length() {
 			Some(len) if len < (1 << 20) => len as usize,
@@ -287,6 +310,10 @@ impl ConnectionInternal {
 	}
 
 	fn write_message(&mut self, msg: RawMessage) -> Result<()> {
+		if self.chocked {
+			// no point to send if other peer will probably ignore it
+			return Ok(());
+		}
 		match msg {
 			RawMessage::KeepAlive => {
 				self.write_bytes(&[0, 0, 0, 0])
@@ -348,10 +375,47 @@ impl ConnectionInternal {
 		}
 	}
 
+	fn send_handshake(&mut self) -> Result<()> {
+		try!(self.write_bytes(b"\x13BitTorrent protocol"));
+		try!(self.write_bytes(&[0, 0, 0, 0, 0, 0, 0, 0]));
+		// need to clone to statisfy borrow checker :/
+		// but they are 20 bytes arrays anyways
+		let hash = self.info_hash.clone();
+		let id = self.id.0.clone();
+		try!(self.write_bytes(&hash));
+		self.write_bytes(&id)
+	}
+
+	fn check_handshake(&mut self) -> Result<bool> {
+		try!(self.receive_bytes());
+
+		if self.next_message.len() < 60 {
+			Ok(false)
+		} else {
+			if &self.next_message[0..20] == b"\x13BitTorrent protocol" ||
+				&self.next_message[20..40] == &self.info_hash {
+				Ok(true)
+			} else {
+				Err(ConnectionError::BadHandshake)
+			}
+		}
+	}
+
 	fn run(&mut self) -> Result<()> {
 		let read_timeout = Duration::from_millis(100);
 		try!(self.stream.set_read_timeout(Some(read_timeout))
 			.map_err(ConnectionError::FailedToInit));
+
+		try!(self.send_handshake());
+
+		let mut checks = 0;
+		while !(try!(self.check_handshake())) {
+			checks += 1;
+			if checks > 50 {
+				return Err(ConnectionError::NoHandshake);
+			}
+			thread::sleep_ms(500);
+		}
 
 		loop {
 			match try!(self.get_raw_message()) {
@@ -457,6 +521,10 @@ impl ConnectionError {
 				"read error".to_string(),
 			&ConnectionError::WriteError(_) =>
 				"write error".to_string(),
+			&ConnectionError::BadHandshake =>
+				"bad peer handshake".to_string(),
+			&ConnectionError::NoHandshake =>
+				"peer didn't send handshake".to_string(),
 		}
 	}
 }
