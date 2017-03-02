@@ -113,7 +113,7 @@ impl HttpTracker {
 
 	fn build_request(&mut self, down: u64, up: u64, left: u64) -> Url {
 		fn nibble_to_char(nibble: u8) -> char {
-			if nibble <= 10 {
+			if nibble < 10 {
 				('0' as u8 + nibble) as char
 			} else {
 				('A' as u8 + nibble - 10) as char
