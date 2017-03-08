@@ -2,11 +2,14 @@ pub mod tracker;
 pub mod connection;
 
 use std::path::PathBuf;
+use std::net::Ipv6Addr;
 use torrent::Torrent;
 use storage::Storage;
 use self::tracker::{Tracker, TrackerArgs};
 use self::connection::Connection;
 
+
+const LISTEN_PORT: u16 = 6981;
 
 #[derive(Clone)]
 pub struct DownloaderId(pub [u8; 20]);
@@ -15,7 +18,7 @@ pub struct Downloader<S: Storage, T: Tracker> {
 	storage: S,
 	tracker: T,
 	connections: Vec<Connection>,
-	known_peers: Vec<(u32, u16)>,
+	known_peers: Vec<(Ipv6Addr, u16)>,
 	downloaded: u64,
 	id: DownloaderId,
 	info_hash: [u8; 20],
@@ -25,7 +28,7 @@ pub struct Downloader<S: Storage, T: Tracker> {
 impl<S: Storage, T: Tracker> Downloader<S, T> {
 	pub fn new(path: PathBuf, info_hash: [u8; 20], torrent: Torrent) -> Downloader<S, T> {
 		let id = generate_id();
-		let port = 10; // TODO: actually get a port and listen
+		let port = LISTEN_PORT; // TODO: actually get a port and listen
 		let storage = S::new(path, torrent.info);
 		let tracker = T::new(TrackerArgs {
 			tracker_url: torrent.tracker_url,
@@ -67,13 +70,23 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn remove_dead_connections(&mut self) {
+		let before = self.connections.len();
 		self.connections.retain(|con| !con.is_dead());
+		let after = self.connections.len();
+		let removed = before - after;
+		if removed > 0 {
+			println!("Removed {} dead connections", removed);
+		}
 	}
 
 	fn open_new_connections(&mut self) {
 		while self.connections.len() == 0 {
 			match self.pick_peer() {
 				Some((ip, port)) => {
+					if port == LISTEN_PORT {
+						// that's me!
+						continue;
+					}
 					let con = Connection::new(
 						self.id.clone(),
 						self.info_hash.clone(),
@@ -89,7 +102,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		}
 	}
 
-	fn pick_peer(&self) -> Option<(u32, u16)> {
+	fn pick_peer(&self) -> Option<(Ipv6Addr, u16)> {
 		if self.known_peers.len() == 0 {
 			None
 		} else {
@@ -109,10 +122,16 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 }
 
 fn generate_id() -> DownloaderId {
-	let mut id: [u8; 20] = *b"-DJ0001-????????????";
+	let mut id: [u8; 20] = *b"-dj0001-????????????";
 	for i in 8..20 {
-		let digit: u8 = (::rand::random::<u64>() % 10) as u8;
-		let ch = '0' as u8 + digit;
+		let digit: u8 = (::rand::random::<u64>() % 62) as u8;
+		let ch = if digit < 10 {
+			'0' as u8 + digit
+		} else if digit < 10 + 26 {
+			'a' as u8 + (digit - 10)
+		} else {
+			'A' as u8 + (digit - 10 - 26)
+		};
 		id[i] = ch;
 	}
 	DownloaderId(id)

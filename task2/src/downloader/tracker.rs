@@ -3,6 +3,7 @@ use ::hyper::client::{Client, IntoUrl};
 use ::hyper::status::StatusCode;
 use ::hyper::Url;
 use ::std::time::{Instant, Duration};
+use ::std::net::{Ipv4Addr, Ipv6Addr};
 use bencode::*;
 use downloader::DownloaderId;
 
@@ -22,7 +23,7 @@ pub struct TrackerArgs {
 
 pub struct Response {
 	pub query_interval: u64,
-	pub peers: Vec<(u32, u16)>,
+	pub peers: Vec<(Ipv6Addr, u16)>,
 }
 
 pub struct HttpTracker {
@@ -102,6 +103,10 @@ impl HttpTracker {
 				return;
 			}
 		};
+		println!("Got peers: {}", decoded.peers.len());
+		for peer in decoded.peers.iter() {
+			println!("  Ip: {}, port: {}", peer.0, peer.1);
+		}
 		self.store_response(decoded);
 	}
 
@@ -174,10 +179,14 @@ fn decode_response(value: BValue) -> Result<Response, &'static str> {
 	})
 }
 
-fn decode_peers(value: BValue) -> Result<Vec<(u32, u16)>, &'static str> {
+fn decode_peers(value: BValue) -> Result<Vec<(Ipv6Addr, u16)>, &'static str> {
 	match value {
-		BValue::Dict(_) => {
-			Err("got unpacked peer list (unimplemented)")
+		BValue::List(list) => {
+			let mut peers = Vec::new();
+			for peer in list {
+				peers.push(try!(decode_peer(peer)));
+			}
+			Ok(peers)
 		}
 		BValue::Str(s) => {
 			if s.len() % 6 != 0 {
@@ -193,6 +202,7 @@ fn decode_peers(value: BValue) -> Result<Vec<(u32, u16)>, &'static str> {
 				let port1 = s[i * 6 + 4] as u16;
 				let port2 = s[i * 6 + 5] as u16;
 				let ip = (ip1 << 24) | (ip2 << 16) | (ip3 << 8) | ip4;
+				let ip = Ipv4Addr::from(ip).to_ipv6_mapped();
 				let port = (port1 << 8) | port2;
 				peers.push((ip, port));
 			}
@@ -202,4 +212,32 @@ fn decode_peers(value: BValue) -> Result<Vec<(u32, u16)>, &'static str> {
 			Err("bad peer list format")
 		}
 	}
+}
+
+fn decode_peer(value: BValue) -> Result<(Ipv6Addr, u16), &'static str> {
+	let mut dict = try!(value.get_dict().ok_or("bad peer"));
+
+	let ip = try!(dict
+		.remove(&b"ip"[..])
+		.and_then(BValue::get_string)
+		.ok_or("missing peer ip")
+		.and_then(|ip| {
+			use std::str::FromStr;
+			let ip_string = String::from_utf8_lossy(&ip);
+			let ipv4: Option<Ipv4Addr> = Ipv4Addr::from_str(&ip_string).ok();
+			let ipv6: Option<Ipv6Addr> = Ipv6Addr::from_str(&ip_string).ok();
+			ipv4.map(|x| x.to_ipv6_mapped()).or(ipv6).ok_or("bad peer ip")
+		}));
+
+	let port = try!(dict
+		.remove(&b"port"[..])
+		.and_then(|x| x.get_int())
+		.ok_or("missing peer port")
+		.and_then(|port| if port >= 0 && port < ::std::u16::MAX as i64 {
+			Ok(port as u16)
+		} else {
+			Err("bad peer port")
+		}));
+
+	Ok((ip, port))
 }
