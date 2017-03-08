@@ -11,7 +11,7 @@ pub mod storage;
 
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::env;
 
 use torrent::Torrent;
@@ -30,7 +30,6 @@ fn main() {
     };
 
     println!("Torrent file: {}", path);
-    let save_path = PathBuf::from("./test");
     
     let (torrent, info_hash) = read_torrent_file(path).unwrap();
     
@@ -38,7 +37,7 @@ fn main() {
     println!("Downloading: {:?}", torrent.info.root);
     
     let mut downloader: Downloader<MemoryStorage, HttpTracker> =
-        Downloader::new(save_path, info_hash, torrent);
+        Downloader::new(info_hash, torrent);
 
     downloader.run();
 }

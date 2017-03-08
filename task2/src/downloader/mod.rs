@@ -1,7 +1,6 @@
 pub mod tracker;
 pub mod connection;
 
-use std::path::PathBuf;
 use std::net::Ipv6Addr;
 use torrent::Torrent;
 use storage::{Storage, Block};
@@ -11,6 +10,53 @@ use self::connection::Message;
 
 
 const LISTEN_PORT: u16 = 6981;
+const REQUEST_SIZE: usize = 0x4000; // 16 kb
+
+pub struct Request {
+	piece: usize,
+	offset: usize,
+	length: usize,
+}
+
+impl Request {
+	pub fn new(piece: usize, offset: usize, length: usize) -> Request {
+		Request {
+			piece: piece,
+			offset: offset,
+			length: length,
+		}
+	}
+
+	fn split_request(&self, max_length: usize) -> RequestSplitIter {
+		RequestSplitIter {
+			piece: self.piece,
+			max_length: max_length,
+			start: self.offset,
+			end: self.offset + self.length,
+		}
+	}
+}
+
+struct RequestSplitIter {
+	piece: usize,
+	max_length: usize,
+	start: usize,
+	end: usize,
+}
+
+impl Iterator for RequestSplitIter {
+	type Item = Request;
+	fn next(&mut self) -> Option<Request> {
+		if self.start >= self.end {
+			None
+		} else {
+			let start = self.start;
+			let len = ::std::cmp::min(self.end - start, self.max_length);
+			self.start += self.max_length;
+			Some(Request::new(self.piece, start, len))
+		}
+	}
+}
 
 #[derive(Clone)]
 pub struct DownloaderId(pub [u8; 20]);
@@ -29,11 +75,11 @@ pub struct Downloader<S: Storage, T: Tracker> {
 }
 
 impl<S: Storage, T: Tracker> Downloader<S, T> {
-	pub fn new(path: PathBuf, info_hash: [u8; 20], torrent: Torrent) -> Downloader<S, T> {
+	pub fn new(info_hash: [u8; 20], torrent: Torrent) -> Downloader<S, T> {
 		let id = generate_id();
 		let port = LISTEN_PORT; // TODO: actually listen
 		let piece_count = torrent.info.pieces.len();
-		let storage = S::new(path, torrent.info);
+		let storage = S::new(torrent.info);
 		let tracker = T::new(TrackerArgs {
 			tracker_url: torrent.tracker_url,
 			info_hash: info_hash.clone(),
@@ -124,7 +170,15 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn request_pieces(&mut self) {
-		// TODO: request pieces
+		let requests = self.storage
+			.requests()
+			.flat_map(|r| r.split_request(REQUEST_SIZE))
+			.take(20) // TODO: figure out how many
+			.collect::<Vec<_>>();
+		for r in requests {
+			// TODO: actually request pieces
+			println!("{} {} {}", r.piece, r.offset, r.length);
+		}
 	}
 
 	fn update_tracker(&mut self) {

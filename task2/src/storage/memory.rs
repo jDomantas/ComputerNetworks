@@ -1,9 +1,7 @@
-use std::path::PathBuf;
 use storage::*;
+use downloader::Request;
 use torrent::{TorrentInfo, File};
 
-
-const REQUEST_SIZE: usize = 0x4000; // 16 kb
 
 struct Piece {
 	index: usize,
@@ -32,12 +30,10 @@ impl Piece {
 		}
 	}
 
-	fn fill_request(&self) -> Option<Request> {
+	fn create_fill_request(&self) -> Option<Request> {
 		let missing_size = self.size - self.data.len();
 		let offset = self.data.len();
-		if missing_size > REQUEST_SIZE {
-			Some(Request::new(self.index, offset, REQUEST_SIZE))
-		} else if missing_size > 0 {
+		if missing_size > 0 {
 			Some(Request::new(self.index, offset, missing_size))
 		} else {
 			None
@@ -48,12 +44,10 @@ impl Piece {
 pub struct MemoryStorage {
 	pieces: Vec<Piece>,
 	files: Vec<File>,
-	dir: PathBuf,
 }
 
-
 impl Storage for MemoryStorage {
-	fn new(dir: PathBuf, info: TorrentInfo) -> Self {
+	fn new(info: TorrentInfo) -> Self {
 		let mut size = info.files.iter()
 			.map(|ref f| f.length as usize)
 			.fold(0, |a, b| a + b);
@@ -82,7 +76,6 @@ impl Storage for MemoryStorage {
 		MemoryStorage {
 			pieces: pieces,
 			files: info.files,
-			dir: dir,
 		}
 	}
 
@@ -115,10 +108,8 @@ impl Storage for MemoryStorage {
 		})
 	}
 
-	fn create_request(&self) -> Option<Request> {
-		self.pieces.iter()
-			.map(Piece::fill_request)
-			.fold(None, |a, b| a.or(b))
+	fn requests<'a>(&'a self) -> Box<Iterator<Item=Request> + 'a> {
+		Box::new(self.pieces.iter().filter_map(|x| x.create_fill_request()))
 	}
 
 	fn bytes_missing(&self) -> usize {
