@@ -7,6 +7,7 @@ use torrent::Torrent;
 use storage::Storage;
 use self::tracker::{Tracker, TrackerArgs};
 use self::connection::Connection;
+use self::connection::Message;
 
 
 const LISTEN_PORT: u16 = 6981;
@@ -17,18 +18,21 @@ pub struct DownloaderId(pub [u8; 20]);
 pub struct Downloader<S: Storage, T: Tracker> {
 	storage: S,
 	tracker: T,
-	connections: Vec<Connection>,
+	connections: Vec<(PeerInfo, Connection)>,
 	known_peers: Vec<(Ipv6Addr, u16)>,
 	downloaded: u64,
+	uploaded: u64,
 	id: DownloaderId,
 	info_hash: [u8; 20],
 	port: u16,
+	part_count: usize,
 }
 
 impl<S: Storage, T: Tracker> Downloader<S, T> {
 	pub fn new(path: PathBuf, info_hash: [u8; 20], torrent: Torrent) -> Downloader<S, T> {
 		let id = generate_id();
-		let port = LISTEN_PORT; // TODO: actually get a port and listen
+		let port = LISTEN_PORT; // TODO: actually listen
+		let piece_count = torrent.info.pieces.len();
 		let storage = S::new(path, torrent.info);
 		let tracker = T::new(TrackerArgs {
 			tracker_url: torrent.tracker_url,
@@ -42,9 +46,11 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			connections: Vec::new(),
 			known_peers: Vec::new(),
 			downloaded: 0,
+			uploaded: 0,
 			id: id,
 			port: port,
 			info_hash: info_hash,
+			part_count: piece_count,
 		}
 	}
 
@@ -55,23 +61,74 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			self.remove_dead_connections();
 			self.check_for_new_peers();
 			self.open_new_connections();
-			// TODO: process messages
-			let sleep = ::std::time::Duration::from_secs(5);
+			self.process_messages();
+			self.request_pieces();
+			let sleep = ::std::time::Duration::from_millis(500);
 			::std::thread::sleep(sleep);
 		}
 		println!("Download complete");
 	}
 
+	fn process_messages(&mut self) {
+		for &mut (ref mut peer, ref mut con) in &mut self.connections {
+			while let Some(msg) = con.receive() {
+				match msg {
+					Message::Dead => {
+						break;
+					}
+					Message::Bitfield(bits) => {
+						peer.got_parts(bits);
+					}
+					Message::Have(index) => {
+						peer.got_part(index);
+					}
+					Message::Cancel(_, _, _) => {
+						// because we only send pieces that were
+						// available at the time of request,
+						// cancel requests will be ignored
+					}
+					Message::Request(part, offset, length) => {
+						match self.storage.get_piece(part as u64) {
+							Some(piece) => {
+								let off = offset as usize;
+								let len = length as usize;
+								if off + len > piece.len() {
+									println!("Client sent bad request: {} {}", off, len);
+								} else {
+									let data = &piece[off..(off + len)];
+									con.send(Message::Piece(
+										part,
+										offset,
+										data.to_vec()));
+								}
+							}
+							None => {
+								// we don't have the piece :(
+							}
+						}
+					}
+					Message::Piece(part, offset, payload) => {
+						self.storage.store_block(part as u64, offset as u64, payload);
+					}
+				}
+			}
+		}
+	}
+
+	fn request_pieces(&mut self) {
+		// TODO: request pieces
+	}
+
 	fn update_tracker(&mut self) {
 		let down = self.downloaded;
-		let up = 0; // :(
+		let up = self.uploaded;
 		let left = self.storage.bytes_missing();
 		self.tracker.update_tracker(down, up, left);
 	}
 
 	fn remove_dead_connections(&mut self) {
 		let before = self.connections.len();
-		self.connections.retain(|con| !con.is_dead());
+		self.connections.retain(|&(_, ref con)| !con.is_dead());
 		let after = self.connections.len();
 		let removed = before - after;
 		if removed > 0 {
@@ -88,7 +145,8 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 						self.info_hash.clone(),
 						ip,
 						port);
-					self.connections.push(con);
+					let info = PeerInfo::new(self.part_count);
+					self.connections.push((info, con));
 				}
 				None => {
 					// no known peers, don't try to loop here
@@ -131,4 +189,58 @@ fn generate_id() -> DownloaderId {
 		id[i] = ch;
 	}
 	DownloaderId(id)
+}
+
+struct PeerInfo {
+	part_mask: Vec<u8>,
+	part_count: usize,
+}
+
+impl PeerInfo {
+	fn new(part_count: usize) -> PeerInfo {
+		let bytes = (part_count + 7) / 8;
+		PeerInfo {
+			part_mask: vec![0; bytes],
+			part_count: part_count,
+		}
+	}
+
+	fn got_part(&mut self, index: u32) {
+		let index = index as usize;
+		if index >= self.part_count {
+			println!("Peer announced about bad part: {}", index);
+		} else {
+			let byte = index / 8;
+			// high bit in byte #0 corresponds to piece #0
+			let bit = 7 - index % 8;
+			self.part_mask[byte] |= 1 << bit;
+		}
+	}
+
+	fn does_have_part(&mut self, index: u32) -> bool {
+		let index = index as usize;
+		if index >= self.part_count {
+			false
+		} else {
+			let byte = index / 8;
+			// high bit in byte #0 corresponds to piece #0
+			let bit = 7 - index % 8;
+			(self.part_mask[byte] & !(1 << bit)) != 0
+		}
+	}
+
+	fn got_parts(&mut self, bitfield: Vec<u8>) {
+		if bitfield.len() != self.part_mask.len() {
+			println!("Peer sent bitfield of bad size: {}", bitfield.len());
+		} else {
+			let empty_bits = self.part_count % 8;
+			let empty_bit_mask = ((1_u16 << empty_bits) - 1) as u8;
+			let unused_bits = bitfield[bitfield.len() - 1] & empty_bit_mask;
+			if unused_bits != 0 {
+				println!("Peer sent bad bitfield - some of spare bits are set");
+			} else {
+				self.part_mask = bitfield;
+			}
+		}
+	}
 }
