@@ -103,6 +103,7 @@ pub enum ConnectionError {
 	WriteError(io::Error),
 	BadHandshake,
 	NoHandshake,
+	Loopback,
 }
 
 pub type Result<T> = ::std::result::Result<T, ConnectionError>;
@@ -407,9 +408,14 @@ impl ConnectionInternal {
 		} else {
 			if &self.next_message[0..20] == b"\x13BitTorrent protocol" ||
 				&self.next_message[28..48] == &self.info_hash {
-				self.remove_bytes(68);
-				println!("Completed handshake with {}", self.peer_name);
-				Ok(true)
+				// if handshake contains our id, disconnect
+				if self.next_message[48..68] == self.id.0 {
+					Err(ConnectionError::Loopback)
+				} else {
+					self.remove_bytes(68);
+					println!("Completed handshake with {}", self.peer_name);
+					Ok(true)
+				}
 			} else {
 				Err(ConnectionError::BadHandshake)
 			}
@@ -540,6 +546,8 @@ impl ConnectionError {
 				"bad peer handshake".to_string(),
 			&ConnectionError::NoHandshake =>
 				"peer didn't send handshake".to_string(),
+			&ConnectionError::Loopback =>
+				"connected to myself".to_string(),
 		}
 	}
 }

@@ -83,10 +83,6 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		while self.connections.len() == 0 {
 			match self.pick_peer() {
 				Some((ip, port)) => {
-					if port == LISTEN_PORT {
-						// that's me!
-						continue;
-					}
 					let con = Connection::new(
 						self.id.clone(),
 						self.info_hash.clone(),
