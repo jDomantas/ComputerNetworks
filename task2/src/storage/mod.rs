@@ -23,19 +23,30 @@ impl Block {
 	}
 }
 
+pub struct Request {
+	pub piece: usize,
+	pub offset: usize,
+	pub size: usize,
+}
+
+impl Request {
+	pub fn new(piece: usize, offset: usize, size: usize) -> Request {
+		Request {
+			piece: piece,
+			offset: offset,
+			size: size,
+		}
+	}
+}
+
 pub trait Storage {
 	fn new(dir: PathBuf, info: TorrentInfo) -> Self;
 	fn get_piece(&mut self, index: usize) -> Option<&[u8]>;
 	fn store_block(&mut self, block: Block) -> Result<(), BadBlock>;
 	fn bytes_missing(&self) -> usize;
+	fn create_request(&self) -> Option<Request>;
 
 	fn is_complete(&self) -> bool {
 		self.bytes_missing() == 0
 	}
-}
-
-pub fn is_piece_valid(piece: &[u8], expected_hash: &[u8; 20]) -> bool {
-	let mut hasher = ::sha1::Sha1::new();
-	hasher.update(piece);
-	&hasher.digest().bytes() == expected_hash
 }

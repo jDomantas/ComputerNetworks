@@ -23,6 +23,10 @@ impl Storage for DummyStorage {
 		Ok(())
 	}
 
+	fn create_request(&self) -> Option<Request> {
+		None
+	}
+
 	fn bytes_missing(&self) -> usize {
 		let DummyStorage(missing) = *self;
 		missing

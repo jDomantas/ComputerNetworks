@@ -3,10 +3,46 @@ use storage::*;
 use torrent::{TorrentInfo, File};
 
 
+const REQUEST_SIZE: usize = 0x4000; // 16 kb
+
 struct Piece {
+	index: usize,
 	size: usize,
 	data: Vec<u8>,
 	hash: [u8; 20],
+}
+
+impl Piece {
+	fn is_complete(&self) -> bool {
+		self.size == self.data.len()
+	}
+
+	fn is_correct(&self) -> bool {
+		if !self.is_complete() {
+			return true;
+		}
+		let mut hasher = ::sha1::Sha1::new();
+		hasher.update(&self.data);
+		hasher.digest().bytes() == self.hash
+	}
+
+	fn validate(&mut self) {
+		if !self.is_correct() {
+			self.data.clear();
+		}
+	}
+
+	fn fill_request(&self) -> Option<Request> {
+		let missing_size = self.size - self.data.len();
+		let offset = self.data.len();
+		if missing_size > REQUEST_SIZE {
+			Some(Request::new(self.index, offset, REQUEST_SIZE))
+		} else if missing_size > 0 {
+			Some(Request::new(self.index, offset, missing_size))
+		} else {
+			None
+		}
+	}
 }
 
 pub struct MemoryStorage {
@@ -14,6 +50,7 @@ pub struct MemoryStorage {
 	files: Vec<File>,
 	dir: PathBuf,
 }
+
 
 impl Storage for MemoryStorage {
 	fn new(dir: PathBuf, info: TorrentInfo) -> Self {
@@ -31,7 +68,9 @@ impl Storage for MemoryStorage {
 				size
 			};
 			size -= s;
+			let index = pieces.len();
 			pieces.push(Piece {
+				index: index,
 				size: s,
 				data: Vec::new(),
 				hash: hash,
@@ -69,10 +108,17 @@ impl Storage for MemoryStorage {
 					for &byte in &block.data[skip..] {
 						piece.data.push(byte);
 					}
+					piece.validate();
 				}
 				Ok(())
 			}
 		})
+	}
+
+	fn create_request(&self) -> Option<Request> {
+		self.pieces.iter()
+			.map(Piece::fill_request)
+			.fold(None, |a, b| a.or(b))
 	}
 
 	fn bytes_missing(&self) -> usize {
