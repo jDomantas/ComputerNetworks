@@ -20,8 +20,8 @@ pub struct Downloader<S: Storage, T: Tracker> {
 	tracker: T,
 	connections: Vec<(PeerInfo, Connection)>,
 	known_peers: Vec<(Ipv6Addr, u16)>,
-	downloaded: u64,
-	uploaded: u64,
+	downloaded: usize,
+	uploaded: usize,
 	id: DownloaderId,
 	info_hash: [u8; 20],
 	port: u16,
@@ -88,7 +88,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 						// cancel requests will be ignored
 					}
 					Message::Request(part, offset, length) => {
-						match self.storage.get_piece(part as u64) {
+						match self.storage.get_piece(part as usize) {
 							Some(piece) => {
 								let off = offset as usize;
 								let len = length as usize;
@@ -108,7 +108,10 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 						}
 					}
 					Message::Piece(part, offset, payload) => {
-						self.storage.store_block(part as u64, offset as u64, payload);
+						self.storage.store_block(
+							part as usize,
+							offset as usize,
+							payload);
 					}
 				}
 			}

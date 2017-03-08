@@ -10,7 +10,7 @@ use downloader::DownloaderId;
 
 pub trait Tracker {
 	fn new(args: TrackerArgs) -> Self;
-	fn update_tracker(&mut self, down: u64, up: u64, left: u64);
+	fn update_tracker(&mut self, down: usize, up: usize, left: usize);
 	fn latest_response(&mut self) -> Option<Response>;
 }
 
@@ -46,7 +46,7 @@ impl Tracker for HttpTracker {
 		}
 	}
 
-	fn update_tracker(&mut self, down: u64, up: u64, left: u64) {
+	fn update_tracker(&mut self, down: usize, up: usize, left: usize) {
 		if self.can_send_request() {
 			let retry_interval = Duration::new(10, 0);
 			self.no_requests_before = Instant::now() + retry_interval;
@@ -116,7 +116,7 @@ impl HttpTracker {
 		self.latest_response = Some(response);
 	}
 
-	fn build_request(&mut self, down: u64, up: u64, left: u64) -> Url {
+	fn build_request(&mut self, down: usize, up: usize, left: usize) -> Url {
 		fn nibble_to_char(nibble: u8) -> char {
 			if nibble < 10 {
 				('0' as u8 + nibble) as char
