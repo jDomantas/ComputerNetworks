@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use storage::Storage;
+use storage::*;
 use torrent::TorrentInfo;
 
 
@@ -15,16 +15,12 @@ impl Storage for DummyStorage {
 		DummyStorage(total_length)
 	}
 
-	fn contains_piece(&self, _index: usize) -> bool {
-		false
-	}
-
 	fn get_piece(&mut self, _index: usize) -> Option<&[u8]> {
 		None
 	}
 
-	fn store_block(&mut self, _index: usize, _offset: usize, _data: Vec<u8>) {
-
+	fn store_block(&mut self, _block: Block) -> Result<(), BadBlock> {
+		Ok(())
 	}
 
 	fn bytes_missing(&self) -> usize {

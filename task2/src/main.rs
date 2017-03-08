@@ -17,7 +17,7 @@ use std::env;
 use torrent::Torrent;
 use downloader::Downloader;
 use downloader::tracker::HttpTracker;
-use storage::dummy::DummyStorage;
+use storage::memory::MemoryStorage;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -37,7 +37,7 @@ fn main() {
     println!("Parsed file!");
     println!("Downloading: {:?}", torrent.info.root);
     
-    let mut downloader: Downloader<DummyStorage, HttpTracker> =
+    let mut downloader: Downloader<MemoryStorage, HttpTracker> =
         Downloader::new(save_path, info_hash, torrent);
 
     downloader.run();

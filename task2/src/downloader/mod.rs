@@ -4,7 +4,7 @@ pub mod connection;
 use std::path::PathBuf;
 use std::net::Ipv6Addr;
 use torrent::Torrent;
-use storage::Storage;
+use storage::{Storage, Block};
 use self::tracker::{Tracker, TrackerArgs};
 use self::connection::Connection;
 use self::connection::Message;
@@ -93,7 +93,8 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 								let off = offset as usize;
 								let len = length as usize;
 								if off + len > piece.len() {
-									println!("Client sent bad request: {} {}", off, len);
+									// client sent bad request
+									// TODO: disconnect him
 								} else {
 									let data = &piece[off..(off + len)];
 									con.send(Message::Piece(
@@ -108,10 +109,14 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 						}
 					}
 					Message::Piece(part, offset, payload) => {
-						self.storage.store_block(
-							part as usize,
-							offset as usize,
-							payload);
+						let block = Block::new(part as usize, offset as usize, payload);
+						match self.storage.store_block(block) {
+							Ok(()) => { }
+							Err(_) => {
+								// peer sent bad block
+								// TODO: disconnect him
+							}
+						}
 					}
 				}
 			}
@@ -197,6 +202,7 @@ fn generate_id() -> DownloaderId {
 struct PeerInfo {
 	part_mask: Vec<u8>,
 	part_count: usize,
+	has_parts: usize,
 }
 
 impl PeerInfo {
@@ -205,18 +211,21 @@ impl PeerInfo {
 		PeerInfo {
 			part_mask: vec![0; bytes],
 			part_count: part_count,
+			has_parts: 0,
 		}
 	}
 
 	fn got_part(&mut self, index: u32) {
-		let index = index as usize;
-		if index >= self.part_count {
-			println!("Peer announced about bad part: {}", index);
-		} else {
-			let byte = index / 8;
+		let index2 = index as usize;
+		if index2 >= self.part_count {
+			println!("Peer announced about bad part: {}", index2);
+		} else if !self.does_have_part(index) {
+			let byte = index2 / 8;
 			// high bit in byte #0 corresponds to piece #0
-			let bit = 7 - index % 8;
+			let bit = 7 - index2 % 8;
 			self.part_mask[byte] |= 1 << bit;
+			self.has_parts += 1;
+			println!("Peer has {}/{} parts", self.has_parts, self.part_count);
 		}
 	}
 
@@ -244,6 +253,15 @@ impl PeerInfo {
 			} else {
 				self.part_mask = bitfield;
 			}
+
+			let mut has = 0_usize;
+			for i in 0..(self.part_count) {
+				if self.does_have_part(i as u32) {
+					has += 1;
+				}
+			}
+			self.has_parts = has;
+			println!("Peer has {}/{} parts", self.has_parts, self.part_count);
 		}
 	}
 }

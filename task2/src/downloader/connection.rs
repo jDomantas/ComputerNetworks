@@ -423,7 +423,7 @@ impl ConnectionInternal {
 	}
 
 	fn run(&mut self) -> Result<()> {
-		let read_timeout = Duration::from_millis(300);
+		let read_timeout = Duration::from_millis(100);
 		try!(self.stream.set_read_timeout(Some(read_timeout))
 			.map_err(ConnectionError::FailedToInit));
 
@@ -437,6 +437,9 @@ impl ConnectionInternal {
 			}
 			thread::sleep(Duration::from_millis(1000));
 		}
+
+		try!(self.write_message(RawMessage::Interested));
+		try!(self.write_message(RawMessage::Unchoke));
 
 		loop {
 			match try!(self.get_raw_message()) {

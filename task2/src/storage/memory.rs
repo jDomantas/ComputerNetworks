@@ -1,48 +1,83 @@
 use std::path::PathBuf;
-use std::collections::HashMap;
-use storage::Storage;
-use torrent::TorrentInfo;
+use storage::*;
+use torrent::{TorrentInfo, File};
 
+
+struct Piece {
+	size: usize,
+	data: Vec<u8>,
+	hash: [u8; 20],
+}
 
 pub struct MemoryStorage {
-	pieces: HashMap<usize, Vec<u8>>,
-	piece_size: usize,
-	piece_hashes: Vec<[u8; 20]>,
+	pieces: Vec<Piece>,
+	files: Vec<File>,
+	dir: PathBuf,
 }
 
 impl Storage for MemoryStorage {
-	fn new(_dir: PathBuf, info: TorrentInfo) -> Self {
-		MemoryStorage {
-			pieces: HashMap::new(),
-			piece_size: info.piece_length as usize,
-			piece_hashes: info.pieces,
+	fn new(dir: PathBuf, info: TorrentInfo) -> Self {
+		let mut size = info.files.iter()
+			.map(|ref f| f.length as usize)
+			.fold(0, |a, b| a + b);
+		let mut pieces = Vec::new();
+		for hash in info.pieces {
+			if size == 0 {
+				panic!("Cannot divide to pieces");
+			}
+			let s = if size > info.piece_length as usize {
+				info.piece_length as usize
+			} else {
+				size
+			};
+			size -= s;
+			pieces.push(Piece {
+				size: s,
+				data: Vec::new(),
+				hash: hash,
+			});
 		}
-	}
-
-	fn contains_piece(&self, index: usize) -> bool {
-		self.pieces.get(&index).is_some()
+		if size != 0 {
+			panic!("Cannot divide to pieces");
+		}
+		MemoryStorage {
+			pieces: pieces,
+			files: info.files,
+			dir: dir,
+		}
 	}
 
 	fn get_piece(&mut self, index: usize) -> Option<&[u8]> {
-		self.pieces.get(&index).map(|x| x as &[u8])
+		self.pieces.get(index).and_then(|ref piece| {
+			if piece.data.len() == piece.size {
+				Some(piece.data.as_slice())
+			} else {
+				None
+			}
+		})
 	}
 
-	fn store_block(&mut self, index: usize, offset: usize, data: Vec<u8>) {
-		if index >= self.piece_hashes.len() {
-			println!("Got bad piece, index: {}", index);
-		} else if offset != 0 || data.len() != self.piece_size {
-			println!("Got partial piece: off: {}, len: {}", offset, data.len());
-			println!("Won't store :(");
-		} else if !super::is_piece_valid(&data, &self.piece_hashes[index]) {
-			println!("Piece is corrupt");
-		} else {
-			println!("Storing piece #{}", index);
-			self.pieces.insert(index, data);
-		}
+	fn store_block(&mut self, block: Block) -> Result<(), BadBlock> {
+		self.pieces.get_mut(block.piece).ok_or(BadBlock).and_then(|ref mut piece| {
+			let old_end = piece.data.len();
+			let new_end = block.offset + piece.data.len();
+			if new_end > piece.size {
+				Err(BadBlock)
+			} else {
+				if new_end > old_end && block.offset <= old_end {
+					let skip = block.offset - old_end;
+					for &byte in &block.data[skip..] {
+						piece.data.push(byte);
+					}
+				}
+				Ok(())
+			}
+		})
 	}
 
 	fn bytes_missing(&self) -> usize {
-		let pieces_missing = self.pieces.len() - self.piece_hashes.len();
-		pieces_missing * self.piece_size
+		self.pieces.iter()
+			.map(|ref piece| piece.size - piece.data.len())
+			.fold(0, |a, b| a + b)
 	}
 }
