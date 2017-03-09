@@ -45,7 +45,7 @@ impl Connection {
 				Ok(()) => { }
 				Err(e) => {
 					let descr = e.description();
-					println!("Connection to {} closed:\n  {}", name, descr);
+					debug!("Connection to {} closed: {}", name, descr);
 					return;
 				}
 			}
@@ -104,6 +104,7 @@ pub enum ConnectionError {
 	BadHandshake,
 	NoHandshake,
 	Loopback,
+	BadPeerAddress,
 }
 
 pub type Result<T> = ::std::result::Result<T, ConnectionError>;
@@ -145,11 +146,11 @@ struct ConnectionInternal {
 
 impl ConnectionInternal {
 	fn new(params: ConnParams) -> Result<ConnectionInternal> {
-		println!("Connecting to peer {}", params.name);
-		let ip = params.ip.to_ipv4().expect("ip can't be converted to ipv4");
+		debug!("Connecting to peer {}", params.name);
+		let ip = try!(params.ip.to_ipv4().ok_or(ConnectionError::BadPeerAddress));
 		let stream = try!(TcpStream::connect((ip, params.port))
 			.map_err(ConnectionError::FailedToConnect));
-		println!("Connected to {}", params.name);
+		debug!("Connected to {}", params.name);
 		Ok(ConnectionInternal {
 			sender: params.sender,
 			receiver: params.receiver,
@@ -392,7 +393,7 @@ impl ConnectionInternal {
 		}
 		try!(self.write_bytes(&handshake));
 		try!(self.stream.flush().map_err(ConnectionError::WriteError));
-		println!("Sent handshake to {}", self.peer_name);
+		debug!("Sent handshake to {}", self.peer_name);
 		Ok(())
 	}
 
@@ -409,7 +410,7 @@ impl ConnectionInternal {
 					Err(ConnectionError::Loopback)
 				} else {
 					self.remove_bytes(68);
-					println!("Completed handshake with {}", self.peer_name);
+					debug!("Completed handshake with {}", self.peer_name);
 					Ok(true)
 				}
 			} else {
@@ -440,42 +441,42 @@ impl ConnectionInternal {
 		loop {
 			match try!(self.get_raw_message()) {
 				Some(RawMessage::KeepAlive) => {
-					println!("Got KeepAlive from {}", self.peer_name);
+					debug!("Got KeepAlive from {}", self.peer_name);
 				}
 				Some(RawMessage::Choke) => {
-					println!("{} is chocked", self.peer_name);
+					debug!("{} is chocked", self.peer_name);
 					self.chocked = true;
 				}
 				Some(RawMessage::Unchoke) => {
-					println!("{} is not chocked", self.peer_name);
+					debug!("{} is not chocked", self.peer_name);
 					self.chocked = false;
 				}
 				Some(RawMessage::Interested) => {
-					println!("{} is interested", self.peer_name);
+					debug!("{} is interested", self.peer_name);
 					self.interested = true;
 				}
 				Some(RawMessage::NotInterested) => {
-					println!("{} is not interested", self.peer_name);
+					debug!("{} is not interested", self.peer_name);
 					self.interested = false;
 				}
 				Some(RawMessage::Have(piece)) => {
-					println!("{} has piece #{}", self.peer_name, piece);
+					debug!("{} has piece #{}", self.peer_name, piece);
 					self.send(Message::Have(piece));
 				}
 				Some(RawMessage::Bitfield(bits)) => {
-					println!("{} sent bitfield (length: {})", self.peer_name, bits.len() * 8);
+					debug!("{} sent bitfield (length: {})", self.peer_name, bits.len() * 8);
 					self.send(Message::Bitfield(bits));
 				}
 				Some(RawMessage::Request(piece, offset, len)) => {
-					println!("{} wants piece #{}, off: {}, len: {}", self.peer_name, piece, offset, len);
+					debug!("{} wants piece #{}, off: {}, len: {}", self.peer_name, piece, offset, len);
 					self.send(Message::Request(piece, offset, len));
 				}
 				Some(RawMessage::Piece(piece, offset, bytes)) => {
-					println!("{} sent piece #{}, off: {}, len: {}", self.peer_name, piece, offset, bytes.len());
+					debug!("{} sent piece #{}, off: {}, len: {}", self.peer_name, piece, offset, bytes.len());
 					self.send(Message::Piece(piece, offset, bytes));
 				}
 				Some(RawMessage::Cancel(piece, offset, len)) => {
-					println!("{} canceled request for piece #{}, off: {}, len: {}", self.peer_name, piece, offset, len);
+					debug!("{} canceled request for piece #{}, off: {}, len: {}", self.peer_name, piece, offset, len);
 					self.send(Message::Cancel(piece, offset, len));
 				}
 				None => { }
@@ -547,6 +548,8 @@ impl ConnectionError {
 				"peer didn't send handshake".to_string(),
 			&ConnectionError::Loopback =>
 				"connected to myself".to_string(),
+			&ConnectionError::BadPeerAddress =>
+				"bad peer address".to_string(),
 		}
 	}
 }

@@ -7,3 +7,4 @@ authors = ["Domantas Jadenkus <djadenkus@gmail.com>"]
 rand = "0.3"
 sha1 = "0.2.0"
 hyper = "0.10"
+log = "0.3.7"

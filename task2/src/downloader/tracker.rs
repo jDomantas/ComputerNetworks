@@ -61,11 +61,11 @@ impl Tracker for HttpTracker {
 					self.sent_started = true;
 					self.process_tracker_response(response);
 				} else {
-					println!("Tracker response status: {}", response.status);
+					warn!("Tracker response status: {}", response.status);
 				}
 			}
 			Err(error) => {
-				println!("Tracker request failed.\n  {}", error);
+				warn!("Tracker request failed: {}", error);
 			}
 		}
 	}
@@ -85,28 +85,25 @@ impl HttpTracker {
 		match response.read_to_end(&mut body) {
 			Ok(_) => {}
 			Err(e) => {
-				println!("Failed to read tracker response body.\n  {}", e);
+				warn!("Failed to read tracker response body: {}", e);
 				return;
 			}
 		}
 		let bvalue = match decode(&body) {
 			Ok(value) => value,
 			Err(e) => {
-				println!("Tracker response is malformed.\n  {:?}", e);
+				warn!("Tracker response is malformed: {:?}", e);
 				return;
 			}
 		};
 		let decoded = match decode_response(bvalue) {
 			Ok(response) => response,
 			Err(e) => {
-				println!("Tracker response is malformed.\n  {}", e);
+				warn!("Tracker response is malformed: {}", e);
 				return;
 			}
 		};
-		println!("Got peers: {}", decoded.peers.len());
-		for peer in decoded.peers.iter() {
-			println!("  Ip: {}, port: {}", peer.0, peer.1);
-		}
+		debug!("Got {} peers", decoded.peers.len());
 		self.store_response(decoded);
 	}
 

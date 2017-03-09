@@ -26,7 +26,7 @@ impl Piece {
 
 	fn validate(&mut self) {
 		if !self.is_correct() {
-			println!("Hash mismatch, deleting piece #{}", self.index);
+			debug!("Hash mismatch, deleting piece #{}", self.index);
 			self.data.clear();
 		}
 	}
@@ -45,6 +45,7 @@ impl Piece {
 pub struct MemoryStorage {
 	pieces: Vec<Piece>,
 	files: Vec<File>,
+	pieces_complete: usize,
 }
 
 impl Storage for MemoryStorage {
@@ -77,6 +78,7 @@ impl Storage for MemoryStorage {
 		MemoryStorage {
 			pieces: pieces,
 			files: info.files,
+			pieces_complete: 0,
 		}
 	}
 
@@ -90,8 +92,12 @@ impl Storage for MemoryStorage {
 		})
 	}
 
-	fn store_block(&mut self, block: Block) -> Result<(), BadBlock> {
-		let res = self.pieces.get_mut(block.piece).ok_or(BadBlock).and_then(|ref mut piece| {
+	fn store_block(&mut self, block: Block) -> Result<usize, BadBlock> {
+		let mut completed_piece = false;
+
+		let res = self.pieces.get_mut(block.piece)
+			.ok_or(BadBlock)
+			.and_then(|ref mut piece| {
 			let old_end = piece.data.len();
 			let new_end = block.offset + block.data.len();
 			if new_end > piece.size {
@@ -104,12 +110,21 @@ impl Storage for MemoryStorage {
 					}
 					piece.validate();
 					if piece.is_complete() {
-						println!("Finished downloading piece: {}", piece.index);
+						completed_piece = true;
 					}
+					Ok(block.data.len() - skip)
+				} else {
+					Ok(0)
 				}
-				Ok(())
 			}
 		});
+		if completed_piece {
+			self.pieces_complete += 1;
+			info!("Downloaded piece #{} (completed: {}/{})",
+				block.piece,
+				self.pieces_complete,
+				self.pieces.len());
+		}
 		if self.is_complete() {
 			self.dump_to_file();
 		}

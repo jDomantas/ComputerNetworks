@@ -3,6 +3,8 @@
 extern crate rand;
 extern crate sha1;
 extern crate hyper;
+#[macro_use]
+extern crate log;
 
 pub mod bencode;
 pub mod torrent;
@@ -13,6 +15,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::env;
+use log::{LogRecord, LogLevel, LogMetadata, LogLevelFilter, SetLoggerError};
 
 use torrent::Torrent;
 use downloader::Downloader;
@@ -20,6 +23,8 @@ use downloader::tracker::HttpTracker;
 use storage::memory::MemoryStorage;
 
 fn main() {
+    Logger::init().expect("Failed to initialize logger");
+
     let args: Vec<String> = env::args().collect();
     let path = match args.into_iter().nth(1) {
         Some(arg) => arg,
@@ -84,4 +89,27 @@ fn split_to_files<P: AsRef<Path>>(source: P, torrent: Torrent) {
         start = end;
     }
     println!("wrote total {} bytes", start);
+}
+
+struct Logger;
+
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &LogMetadata) -> bool {
+        metadata.level() <= LogLevel::Info
+    }
+
+    fn log(&self, record: &LogRecord) {
+        if self.enabled(record.metadata()) {
+            println!("{} - {}", record.level(), record.args());
+        }
+    }
+}
+
+impl Logger {
+    fn init() -> Result<(), SetLoggerError> {
+        log::set_logger(|max_log_level| {
+            max_log_level.set(LogLevelFilter::Info);
+            Box::new(Logger)
+        })
+    }
 }

@@ -36,6 +36,12 @@ impl Request {
 			end: self.offset + self.length,
 		}
 	}
+
+	fn intersects(&self, other: &Request) -> bool {
+		self.piece == other.piece
+		&& self.offset < other.offset + other.length
+		&& other.offset < self.offset + self.length
+	}
 }
 
 struct RequestSplitIter {
@@ -104,7 +110,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	pub fn run(&mut self) {
-		println!("Running downloader");
+		info!("Running downloader");
 		while !self.storage.is_complete() {
 			self.update_tracker();
 			self.remove_dead_connections();
@@ -115,7 +121,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			let sleep = ::std::time::Duration::from_millis(500);
 			::std::thread::sleep(sleep);
 		}
-		println!("Download complete");
+		info!("Download complete");
 	}
 
 	fn process_messages(&mut self) {
@@ -228,13 +234,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn remove_dead_connections(&mut self) {
-		let before = self.connections.len();
 		self.connections.retain(|&(_, ref con)| !con.is_dead());
-		let after = self.connections.len();
-		let removed = before - after;
-		if removed > 0 {
-			println!("Removed {} dead connections", removed);
-		}
 	}
 
 	fn open_new_connections(&mut self) {
@@ -309,15 +309,13 @@ impl PeerInfo {
 	}
 
 	fn got_part(&mut self, index: usize) {
-		if index >= self.part_count {
-			println!("Peer announced about bad part: {}", index);
-		} else if !self.does_have_part(index) {
+		// TODO: disconnect peer if index is bad
+		if index < self.part_count && !self.does_have_part(index) {
 			let byte = index / 8;
 			// high bit in byte #0 corresponds to piece #0
 			let bit = 7 - index % 8;
 			self.part_mask[byte] |= 1 << bit;
 			self.has_parts += 1;
-			println!("Peer has {}/{} parts", self.has_parts, self.part_count);
 		}
 	}
 
@@ -333,15 +331,13 @@ impl PeerInfo {
 	}
 
 	fn got_parts(&mut self, bitfield: Vec<u8>) {
-		if bitfield.len() != self.part_mask.len() {
-			println!("Peer sent bitfield of bad size: {}", bitfield.len());
-		} else {
+		// TODO: disconnect peer if bitfield length is bad
+		if bitfield.len() == self.part_mask.len() {
 			let empty_bits = self.part_count % 8;
 			let empty_bit_mask = ((1_u16 << empty_bits) - 1) as u8;
 			let unused_bits = bitfield[bitfield.len() - 1] & empty_bit_mask;
-			if unused_bits != 0 {
-				println!("Peer sent bad bitfield - some of spare bits are set");
-			} else {
+			// TODO: disconnect peer if any of spare bits are set
+			if unused_bits == 0 {
 				self.part_mask = bitfield;
 			}
 
@@ -352,7 +348,6 @@ impl PeerInfo {
 				}
 			}
 			self.has_parts = has;
-			println!("Peer has {}/{} parts", self.has_parts, self.part_count);
 		}
 	}
 }
