@@ -91,7 +91,7 @@ impl Storage for MemoryStorage {
 	}
 
 	fn store_block(&mut self, block: Block) -> Result<(), BadBlock> {
-		self.pieces.get_mut(block.piece).ok_or(BadBlock).and_then(|ref mut piece| {
+		let res = self.pieces.get_mut(block.piece).ok_or(BadBlock).and_then(|ref mut piece| {
 			let old_end = piece.data.len();
 			let new_end = block.offset + block.data.len();
 			if new_end > piece.size {
@@ -109,7 +109,11 @@ impl Storage for MemoryStorage {
 				}
 				Ok(())
 			}
-		})
+		});
+		if self.is_complete() {
+			self.dump_to_file();
+		}
+		res
 	}
 
 	fn requests<'a>(&'a self) -> Box<Iterator<Item=Request> + 'a> {
@@ -130,7 +134,7 @@ impl MemoryStorage {
 		let mut total_size = 0_usize;
 		for piece in &self.pieces {
 			total_size += piece.size;
-			file.write(&piece.data).expect("failed to write to file");
+			file.write_all(&piece.data).expect("failed to write to file");
 		}
 		println!("Wrote to file, total size: {}", total_size);
 	}

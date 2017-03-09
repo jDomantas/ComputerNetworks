@@ -25,7 +25,7 @@ impl Block {
 pub trait Storage {
 	fn new(info: TorrentInfo) -> Self;
 	fn get_piece(&mut self, index: usize) -> Option<&[u8]>;
-	fn store_block(&mut self, block: Block) -> Result<(), BadBlock>;
+	fn store_block(&mut self, block: Block) -> Result<usize, BadBlock>;
 	fn bytes_missing(&self) -> usize;
 	fn requests<'a>(&'a self) -> Box<Iterator<Item=Request> + 'a>;
 

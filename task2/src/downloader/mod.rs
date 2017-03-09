@@ -105,7 +105,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 
 	pub fn run(&mut self) {
 		println!("Running downloader");
-		while self.storage.bytes_missing() > 0 {
+		while !self.storage.is_complete() {
 			self.update_tracker();
 			self.remove_dead_connections();
 			self.check_for_new_peers();
@@ -151,6 +151,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 										part,
 										offset,
 										data.to_vec()));
+									self.uploaded += len;
 								}
 							}
 							None => {
@@ -161,7 +162,9 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 					Message::Piece(part, offset, payload) => {
 						let block = Block::new(part as usize, offset as usize, payload);
 						match self.storage.store_block(block) {
-							Ok(()) => { }
+							Ok(new_bytes) => {
+								self.downloaded += new_bytes;
+							}
 							Err(_) => {
 								// peer sent bad block
 								// TODO: disconnect him
@@ -177,7 +180,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	fn request_pieces(&mut self) {
 		let now = Instant::now();
 		let passed = now - self.last_request_time;
-		if passed < ::std::time::Duration::from_secs(10) {
+		if passed < ::std::time::Duration::from_secs(5) {
 			return;
 		}
 		self.last_request_time = Instant::now();
@@ -188,7 +191,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			// take at most one request from each piece
 			.filter_map(|r| r.split_request(REQUEST_SIZE).next())
 			// TODO: figure out how many
-			.take(25)
+			.take(40)
 			.collect::<Vec<_>>();
 
 		for r in requests {
@@ -235,7 +238,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn open_new_connections(&mut self) {
-		while self.connections.len() < 4 {
+		while self.connections.len() < 8 {
 			match self.pick_peer() {
 				Some((ip, port)) => {
 					let con = Connection::new(

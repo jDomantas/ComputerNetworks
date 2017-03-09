@@ -31,7 +31,7 @@ fn main() {
 
     println!("Torrent file: {}", path);
     
-    let (torrent, info_hash) = read_torrent_file(path).unwrap();
+    let (torrent, info_hash) = read_torrent_file(path.clone()).unwrap();
     
     println!("Parsed file!");
     println!("Downloading: {:?}", torrent.info.root);
@@ -40,6 +40,10 @@ fn main() {
         Downloader::new(info_hash, torrent);
 
     downloader.run();
+
+    let (torrent, _) = read_torrent_file(path).unwrap();
+    println!("splitting");
+    split_to_files("./test.out", torrent);
 }
 
 fn read_torrent_file<P: AsRef<Path>>(path: P) -> Option<(Torrent, [u8; 20])> {
@@ -64,4 +68,20 @@ fn read_torrent_file<P: AsRef<Path>>(path: P) -> Option<(Torrent, [u8; 20])> {
     };
 
     Some((torrent, info_hash))
+}
+
+fn split_to_files<P: AsRef<Path>>(source: P, torrent: Torrent) {
+    let mut source = File::open(source).expect("failed to open source file");
+    use std::io::prelude::*;
+    let mut data = Vec::new();
+    source.read_to_end(&mut data).expect("failed to read source");
+    let mut start = 0_usize;
+    for file in torrent.info.files.into_iter() {
+        let mut dest = File::create(file.path.clone()).expect("failed to create file");
+        let end = start + file.length as usize;
+        println!("interval {} - {} goes to {:?}", start, end, file.path.clone());
+        dest.write_all(&data[start..end]).expect("failed to write");
+        start = end;
+    }
+    println!("wrote total {} bytes", start);
 }
