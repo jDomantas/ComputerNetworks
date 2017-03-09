@@ -26,6 +26,7 @@ impl Piece {
 
 	fn validate(&mut self) {
 		if !self.is_correct() {
+			println!("Hash mismatch, deleting piece #{}", self.index);
 			self.data.clear();
 		}
 	}
@@ -92,7 +93,7 @@ impl Storage for MemoryStorage {
 	fn store_block(&mut self, block: Block) -> Result<(), BadBlock> {
 		self.pieces.get_mut(block.piece).ok_or(BadBlock).and_then(|ref mut piece| {
 			let old_end = piece.data.len();
-			let new_end = block.offset + piece.data.len();
+			let new_end = block.offset + block.data.len();
 			if new_end > piece.size {
 				Err(BadBlock)
 			} else {
@@ -102,6 +103,9 @@ impl Storage for MemoryStorage {
 						piece.data.push(byte);
 					}
 					piece.validate();
+					if piece.is_complete() {
+						println!("Finished downloading piece: {}", piece.index);
+					}
 				}
 				Ok(())
 			}
@@ -116,5 +120,18 @@ impl Storage for MemoryStorage {
 		self.pieces.iter()
 			.map(|ref piece| piece.size - piece.data.len())
 			.fold(0, |a, b| a + b)
+	}
+}
+
+impl MemoryStorage {
+	fn dump_to_file(&self) {
+		use std::io::prelude::*;
+		let mut file = ::std::fs::File::create("./test.out").expect("Failed to create file");
+		let mut total_size = 0_usize;
+		for piece in &self.pieces {
+			total_size += piece.size;
+			file.write(&piece.data).expect("failed to write to file");
+		}
+		println!("Wrote to file, total size: {}", total_size);
 	}
 }

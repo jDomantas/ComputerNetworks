@@ -2,6 +2,7 @@ pub mod tracker;
 pub mod connection;
 
 use std::net::Ipv6Addr;
+use std::time::Instant;
 use torrent::Torrent;
 use storage::{Storage, Block};
 use self::tracker::{Tracker, TrackerArgs};
@@ -72,6 +73,7 @@ pub struct Downloader<S: Storage, T: Tracker> {
 	info_hash: [u8; 20],
 	port: u16,
 	part_count: usize,
+	last_request_time: Instant,
 }
 
 impl<S: Storage, T: Tracker> Downloader<S, T> {
@@ -97,6 +99,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			port: port,
 			info_hash: info_hash,
 			part_count: piece_count,
+			last_request_time: Instant::now(),
 		}
 	}
 
@@ -126,7 +129,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 						peer.got_parts(bits);
 					}
 					Message::Have(index) => {
-						peer.got_part(index);
+						peer.got_part(index as usize);
 					}
 					Message::Cancel(_, _, _) => {
 						// because we only send pieces that were
@@ -138,9 +141,10 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 							Some(piece) => {
 								let off = offset as usize;
 								let len = length as usize;
-								if off + len > piece.len() {
+								if off + len > piece.len() || len > REQUEST_SIZE {
 									// client sent bad request
 									// TODO: disconnect him
+									con.send(Message::Dead);
 								} else {
 									let data = &piece[off..(off + len)];
 									con.send(Message::Piece(
@@ -161,6 +165,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 							Err(_) => {
 								// peer sent bad block
 								// TODO: disconnect him
+								con.send(Message::Dead);
 							}
 						}
 					}
@@ -170,15 +175,46 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn request_pieces(&mut self) {
+		let now = Instant::now();
+		let passed = now - self.last_request_time;
+		if passed < ::std::time::Duration::from_secs(10) {
+			return;
+		}
+		self.last_request_time = Instant::now();
+
 		let requests = self.storage
 			.requests()
-			.flat_map(|r| r.split_request(REQUEST_SIZE))
-			.take(20) // TODO: figure out how many
+			// because we only store prefixes of pieces,
+			// take at most one request from each piece
+			.filter_map(|r| r.split_request(REQUEST_SIZE).next())
+			// TODO: figure out how many
+			.take(25)
 			.collect::<Vec<_>>();
+
 		for r in requests {
-			// TODO: actually request pieces
-			println!("{} {} {}", r.piece, r.offset, r.length);
+			if let Some(con) = self.pick_peer_for_request(r.piece) {
+				con.send(Message::Request(
+					r.piece as u32,
+					r.offset as u32,
+					r.length as u32));
+			}
 		}
+	}
+
+	fn pick_peer_for_request(&mut self, piece: usize) -> Option<&mut Connection> {
+		if self.connections.len() == 0 {
+			return None;
+		}
+		let range = (0..(self.connections.len())).into_iter().cycle();
+		let start_with = ::rand::random::<usize>() % self.connections.len();
+		let range = range.skip(start_with).take(self.connections.len());
+		for i in range {
+			let has_part = self.connections[i].0.does_have_part(piece);
+			if has_part {
+				return Some(&mut self.connections[i].1);
+			}
+		}
+		None
 	}
 
 	fn update_tracker(&mut self) {
@@ -199,7 +235,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	}
 
 	fn open_new_connections(&mut self) {
-		while self.connections.len() == 0 {
+		while self.connections.len() < 4 {
 			match self.pick_peer() {
 				Some((ip, port)) => {
 					let con = Connection::new(
@@ -269,22 +305,20 @@ impl PeerInfo {
 		}
 	}
 
-	fn got_part(&mut self, index: u32) {
-		let index2 = index as usize;
-		if index2 >= self.part_count {
-			println!("Peer announced about bad part: {}", index2);
+	fn got_part(&mut self, index: usize) {
+		if index >= self.part_count {
+			println!("Peer announced about bad part: {}", index);
 		} else if !self.does_have_part(index) {
-			let byte = index2 / 8;
+			let byte = index / 8;
 			// high bit in byte #0 corresponds to piece #0
-			let bit = 7 - index2 % 8;
+			let bit = 7 - index % 8;
 			self.part_mask[byte] |= 1 << bit;
 			self.has_parts += 1;
 			println!("Peer has {}/{} parts", self.has_parts, self.part_count);
 		}
 	}
 
-	fn does_have_part(&mut self, index: u32) -> bool {
-		let index = index as usize;
+	fn does_have_part(&self, index: usize) -> bool {
 		if index >= self.part_count {
 			false
 		} else {
@@ -310,7 +344,7 @@ impl PeerInfo {
 
 			let mut has = 0_usize;
 			for i in 0..(self.part_count) {
-				if self.does_have_part(i as u32) {
+				if self.does_have_part(i) {
 					has += 1;
 				}
 			}

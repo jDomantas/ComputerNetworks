@@ -317,10 +317,6 @@ impl ConnectionInternal {
 	}
 
 	fn write_message(&mut self, msg: RawMessage) -> Result<()> {
-		/*if self.chocked {
-			// no point to send if other peer will probably ignore it
-			return Ok(());
-		}*/
 		let write_result = match msg {
 			RawMessage::KeepAlive => {
 				self.write_bytes(&[0, 0, 0, 0])
