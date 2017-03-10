@@ -14,13 +14,27 @@ const LISTEN_PORT: u16 = 6981;
 const REQUEST_SIZE: usize = 0x4000; // 16 kb
 
 #[derive(Clone)]
+pub struct PeerAddress {
+	pub ip: Ipv6Addr,
+	pub port: u16,
+}
+
+impl PeerAddress {
+	pub fn new(ip: Ipv6Addr, port: u16) -> PeerAddress {
+		PeerAddress {
+			ip: ip,
+			port: port,
+		}
+	}
+}
+
+#[derive(Clone)]
 pub struct DownloaderId(pub [u8; 20]);
 
-pub struct Downloader<S: Storage, T: Tracker> {
+pub struct Downloader<S: Storage> {
 	storage: S,
-	tracker: T,
+	tracker: Box<Tracker>,
 	connections: Vec<(PeerInfo, Connection)>,
-	known_peers: Vec<(Ipv6Addr, u16)>,
 	downloaded: usize,
 	uploaded: usize,
 	id: DownloaderId,
@@ -30,13 +44,13 @@ pub struct Downloader<S: Storage, T: Tracker> {
 	last_request_time: Instant,
 }
 
-impl<S: Storage, T: Tracker> Downloader<S, T> {
-	pub fn new(info_hash: [u8; 20], torrent: Torrent) -> Downloader<S, T> {
+impl<S: Storage> Downloader<S> {
+	pub fn new(info_hash: [u8; 20], torrent: Torrent) -> Downloader<S> {
 		let id = generate_id();
 		let port = LISTEN_PORT; // TODO: actually listen
 		let piece_count = torrent.info.pieces.len();
 		let storage = S::new(torrent.info);
-		let tracker = T::new(TrackerArgs {
+		let tracker = tracker::create_tracker(TrackerArgs {
 			tracker_url: torrent.tracker_url,
 			info_hash: info_hash.clone(),
 			id: id.clone(),
@@ -46,7 +60,6 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 			storage: storage,
 			tracker: tracker,
 			connections: Vec::new(),
-			known_peers: Vec::new(),
 			downloaded: 0,
 			uploaded: 0,
 			id: id,
@@ -62,7 +75,6 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		while !self.storage.is_complete() {
 			self.update_tracker();
 			self.remove_dead_connections();
-			self.check_for_new_peers();
 			self.open_new_connections();
 			self.process_messages();
 			self.request_pieces();
@@ -178,7 +190,7 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		let down = self.downloaded;
 		let up = self.uploaded;
 		let left = self.storage.bytes_missing();
-		self.tracker.update_tracker(down, up, left);
+		self.tracker.update(down, up, left);
 	}
 
 	fn remove_dead_connections(&mut self) {
@@ -188,12 +200,12 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 	fn open_new_connections(&mut self) {
 		while self.connections.len() < 8 {
 			match self.pick_peer() {
-				Some((ip, port)) => {
+				Some(address) => {
 					let con = Connection::new(
 						self.id.clone(),
 						self.info_hash.clone(),
-						ip,
-						port);
+						address.ip,
+						address.port);
 					let info = PeerInfo::new(self.part_count);
 					self.connections.push((info, con));
 				}
@@ -205,21 +217,13 @@ impl<S: Storage, T: Tracker> Downloader<S, T> {
 		}
 	}
 
-	fn pick_peer(&self) -> Option<(Ipv6Addr, u16)> {
-		if self.known_peers.len() == 0 {
+	fn pick_peer(&self) -> Option<PeerAddress> {
+		let count = self.tracker.peers().count();
+		if count == 0 {
 			None
 		} else {
-			let index = ::rand::random::<usize>() % self.known_peers.len();
-			Some(self.known_peers[index])
-		}
-	}
-
-	fn check_for_new_peers(&mut self) {
-		match self.tracker.latest_response() {
-			Some(response) => {
-				self.known_peers = response.peers;
-			}
-			None => { }
+			let index = ::rand::random::<usize>() % count;
+			self.tracker.peers().nth(index).cloned()
 		}
 	}
 }

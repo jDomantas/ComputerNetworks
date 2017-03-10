@@ -19,7 +19,6 @@ use log::{LogRecord, LogLevel, LogMetadata, LogLevelFilter, SetLoggerError};
 
 use torrent::Torrent;
 use downloader::Downloader;
-use downloader::tracker::HttpTracker;
 use storage::memory::MemoryStorage;
 
 fn main() {
@@ -41,7 +40,7 @@ fn main() {
     println!("Parsed file!");
     println!("Downloading: {:?}", torrent.info.root);
     
-    let mut downloader: Downloader<MemoryStorage, HttpTracker> =
+    let mut downloader: Downloader<MemoryStorage> =
         Downloader::new(info_hash, torrent);
 
     downloader.run();
