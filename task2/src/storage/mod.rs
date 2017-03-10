@@ -1,7 +1,7 @@
 pub mod memory;
 
 use torrent::TorrentInfo;
-use downloader::Request;
+use downloader::request::Request;
 
 
 pub struct BadBlock;

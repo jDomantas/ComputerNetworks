@@ -1,5 +1,5 @@
 use storage::*;
-use downloader::Request;
+use downloader::request::Request;
 use torrent::{TorrentInfo, File};
 
 

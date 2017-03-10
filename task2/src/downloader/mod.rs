@@ -1,69 +1,17 @@
 pub mod tracker;
 pub mod connection;
+pub mod request;
 
 use std::net::Ipv6Addr;
 use std::time::Instant;
 use torrent::Torrent;
 use storage::{Storage, Block};
 use self::tracker::{Tracker, TrackerArgs};
-use self::connection::Connection;
-use self::connection::Message;
+use self::connection::{Connection, Message};
 
 
 const LISTEN_PORT: u16 = 6981;
 const REQUEST_SIZE: usize = 0x4000; // 16 kb
-
-pub struct Request {
-	piece: usize,
-	offset: usize,
-	length: usize,
-}
-
-impl Request {
-	pub fn new(piece: usize, offset: usize, length: usize) -> Request {
-		Request {
-			piece: piece,
-			offset: offset,
-			length: length,
-		}
-	}
-
-	fn split_request(&self, max_length: usize) -> RequestSplitIter {
-		RequestSplitIter {
-			piece: self.piece,
-			max_length: max_length,
-			start: self.offset,
-			end: self.offset + self.length,
-		}
-	}
-
-	fn intersects(&self, other: &Request) -> bool {
-		self.piece == other.piece
-		&& self.offset < other.offset + other.length
-		&& other.offset < self.offset + self.length
-	}
-}
-
-struct RequestSplitIter {
-	piece: usize,
-	max_length: usize,
-	start: usize,
-	end: usize,
-}
-
-impl Iterator for RequestSplitIter {
-	type Item = Request;
-	fn next(&mut self) -> Option<Request> {
-		if self.start >= self.end {
-			None
-		} else {
-			let start = self.start;
-			let len = ::std::cmp::min(self.end - start, self.max_length);
-			self.start += self.max_length;
-			Some(Request::new(self.piece, start, len))
-		}
-	}
-}
 
 #[derive(Clone)]
 pub struct DownloaderId(pub [u8; 20]);
