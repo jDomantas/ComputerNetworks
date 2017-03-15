@@ -90,11 +90,12 @@ fn split_to_files<P: AsRef<Path>>(source: P, torrent: Torrent) {
     println!("wrote total {} bytes", start);
 }
 
+const LOGGING_LEVEL: LogLevel = LogLevel::Debug;
 struct Logger;
 
 impl log::Log for Logger {
     fn enabled(&self, metadata: &LogMetadata) -> bool {
-        metadata.level() <= LogLevel::Info
+        metadata.level() <= LOGGING_LEVEL
     }
 
     fn log(&self, record: &LogRecord) {
@@ -107,7 +108,7 @@ impl log::Log for Logger {
 impl Logger {
     fn init() -> Result<(), SetLoggerError> {
         log::set_logger(|max_log_level| {
-            max_log_level.set(LogLevelFilter::Info);
+            max_log_level.set(LogLevelFilter::Trace);
             Box::new(Logger)
         })
     }
