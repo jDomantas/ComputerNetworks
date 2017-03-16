@@ -112,8 +112,14 @@ impl Storage for MemoryStorage {
 					if piece.is_complete() {
 						completed_piece = true;
 					}
-					Ok(block.data.len() - skip)
+					// piece was possibly removed because of bad hash
+					if block.data.len() < skip {
+						Ok(0)
+					} else {
+						Ok(block.data.len() - skip)
+					}
 				} else {
+					// given block cannot be attached to prefix, forget about it
 					Ok(0)
 				}
 			}
