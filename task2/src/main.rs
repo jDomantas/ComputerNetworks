@@ -20,6 +20,7 @@ use log::{LogRecord, LogLevel, LogMetadata, LogLevelFilter, SetLoggerError};
 use torrent::Torrent;
 use downloader::Downloader;
 use storage::memory::MemoryStorage;
+use storage::partial::PartialStorage;
 
 fn main() {
     Logger::init().expect("Failed to initialize logger");
@@ -40,7 +41,7 @@ fn main() {
     println!("Parsed file!");
     println!("Downloading: {:?}", torrent.info.root);
     
-    let mut downloader: Downloader<MemoryStorage> =
+    let mut downloader: Downloader<PartialStorage<MemoryStorage>> =
         Downloader::new(info_hash, torrent);
 
     downloader.run();

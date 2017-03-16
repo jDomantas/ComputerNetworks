@@ -212,7 +212,10 @@ impl<S: Storage> Storage for PartialStorage<S> {
 	}
 
 	fn requests<'a>(&'a self) -> Box<Iterator<Item=Request> + 'a> {
-		Box::new(self.partial_pieces.values().flat_map(PartialPiece::requests))
+		let requests = self.partial_pieces.values()
+			.flat_map(PartialPiece::requests)
+			.chain(self.backed_storage.requests());
+		Box::new(requests)
 	}
 
 	fn is_complete(&self) -> bool {
