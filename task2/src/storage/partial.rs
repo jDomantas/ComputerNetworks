@@ -87,14 +87,14 @@ impl PartialPiece {
 		// first segment that is not completely before given one
 		let start = self.segments.iter().enumerate()
 			.filter_map(|(index, seg)| {
-				if segment.intersects(seg) {
+				if seg.end >= segment.start {
 					Some(index)
 				} else {
 					None
 				}
 			})
 			.next()
-			.unwrap_or(0);
+			.unwrap_or(self.segments.len());
 		
 		// first segment that is completely after given one
 		let end = self.segments.iter().enumerate()
