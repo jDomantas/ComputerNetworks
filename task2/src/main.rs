@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::env;
-use log::{LogRecord, LogLevel, LogMetadata, LogLevelFilter, SetLoggerError};
+use log::{LogRecord, LogLevel, LogMetadata, SetLoggerError};
 
 use torrent::Torrent;
 use downloader::Downloader;
@@ -109,7 +109,7 @@ impl log::Log for Logger {
 impl Logger {
     fn init() -> Result<(), SetLoggerError> {
         log::set_logger(|max_log_level| {
-            max_log_level.set(LogLevelFilter::Trace);
+            max_log_level.set(LOGGING_LEVEL.to_log_level_filter());
             Box::new(Logger)
         })
     }
