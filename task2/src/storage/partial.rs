@@ -226,7 +226,8 @@ impl<S: Storage> Storage for PartialStorage<S> {
 impl<S: Storage> PartialStorage<S> {
 	fn receiving_piece(&mut self, piece: usize) {
 		if self.partial_pieces.len() < MAX_PARTIAL_PIECES &&
-			!self.partial_pieces.contains_key(&piece) {
+			!self.partial_pieces.contains_key(&piece) &&
+			!self.backed_storage.has_piece(piece) {
 
 			let piece_length = if piece == self.pieces - 1 {
 				self.last_piece_size
