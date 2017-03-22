@@ -152,8 +152,6 @@ impl<S: Storage> Downloader<S> {
 
 		let requests = self.storage
 			.requests()
-			// because we only store prefixes of pieces,
-			// take at most one request from each piece
 			.flat_map(|r| r.split_request(REQUEST_SIZE))
 			// TODO: figure out how many
 			.take(100)
