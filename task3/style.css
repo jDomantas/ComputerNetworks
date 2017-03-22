@@ -1,0 +1,8 @@
+body {
+	overflow: hidden;
+}
+
+svg {
+	user-select: none;
+	cursor: default;
+}
