@@ -42,11 +42,10 @@ fn main() {
     println!("Downloading: {:?}", torrent.info.root);
     
     let mut downloader: Downloader<PartialStorage<MemoryStorage>> =
-        Downloader::new(info_hash, torrent);
+        Downloader::new(info_hash, torrent.clone());
 
     downloader.run();
 
-    let (torrent, _) = read_torrent_file(path).unwrap();
     println!("splitting");
     split_to_files("./test.out", torrent);
 }
