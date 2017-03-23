@@ -73,7 +73,10 @@ connect pred1 pred2 data (Graph graph) =
           , data = data
           }
       in
-        Graph { graph | edges = newEdge :: graph.edges }
+        if canAddEdge id1 id2 (Graph graph) then
+          Graph { graph | edges = newEdge :: graph.edges }
+        else
+          Graph graph
 
     _ ->
       Graph graph
@@ -197,3 +200,18 @@ rawNeighbours predicate (Graph graph) =
         Just { edge | first = edge.second, second = edge.first }
       else
         Nothing))
+
+
+canAddEdge : Int -> Int -> Graph n e -> Bool
+canAddEdge a b (Graph graph) =
+  let
+    sameEdge edge =
+      (edge.first == a && edge.second == b) ||
+        (edge.second == a && edge.first == b)
+  in
+    if a == b then
+      False
+    else if List.any sameEdge graph.edges then
+      False
+    else
+      True

@@ -3,33 +3,30 @@ import Html.Attributes as HtmlAttrib
 import Mouse
 import Window
 import Task
+import Time
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttrib
 import Graph exposing (Graph)
+import Visualised exposing (Visualised, Node)
+import Point exposing (Point)
 
 
-type alias Point =
-  { x : Int
-  , y : Int
-  }
-
-
-type alias Node =
-  { position : Point
-  , id : Int
+type alias NodeData =
+  { id : Int
   }
 
 
 type alias Model =
   { width : Int
   , height : Int
-  , graph : Graph Node ()
+  , graph : Visualised NodeData ()
   }
 
 
 type Msg
   = AddPoint Point
   | UpdateSize (Maybe Int) (Maybe Int)
+  | Tick
 
 
 main : Program Never Model Msg
@@ -61,8 +58,9 @@ init =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
   Sub.batch
-    [ Mouse.clicks AddPoint
+    [ Mouse.clicks (\pos -> AddPoint { x = toFloat pos.x, y = toFloat pos.y })
     , Window.resizes (\size -> UpdateSize (Just size.width) (Just size.height))
+    , Time.every (Time.second / 60.0) (always Tick)
     ]
 
 
@@ -72,6 +70,14 @@ gcd a b =
     a
   else
     gcd b (a % b)
+
+
+connectId : Int -> Maybe Int
+connectId id =
+  List.range 1 (id - 1)
+  |> List.map (\n -> (gcd id n, n))
+  |> List.maximum
+  |> Maybe.map (\(_, n) -> n)
 
 
 update : Msg -> Model -> Model
@@ -88,14 +94,16 @@ update msg model =
           |> (+) 1
         
         newNode =
-          { position = pt
+          { pos = pt
+          , v = Point.zero
+          , a = Point.zero
           , id = newId
           }
 
         graph =
           model.graph
           |> Graph.addNode newNode
-          |> Graph.connect (\n -> n.id == newNode.id) (\n -> n.id /= newNode.id && gcd n.id newNode.id /= 1) ()
+          |> Graph.connect (\n -> n.id == newNode.id) (\n -> Just n.id == connectId newNode.id) ()
       in
         { model | graph = graph }
     
@@ -105,6 +113,18 @@ update msg model =
         newHeight = Maybe.withDefault model.height height
       in
         { model | width = newWidth, height = newHeight }
+
+    Tick ->
+      let
+        center =
+          { x = toFloat model.width / 2
+          , y = toFloat model.height / 2
+          }
+
+        updatedGraph =
+          Visualised.simulate (1 / 10.0) center model.graph
+      in
+        { model | graph = updatedGraph }
 
 
 view : Model -> Html Msg
@@ -152,17 +172,17 @@ viewModel model =
       items
 
 
-viewPoints : List Node ->List (Svg Never)
+viewPoints : List (Node NodeData) -> List (Svg Never)
 viewPoints =
   List.sortBy .id >> List.map viewPoint
 
 
-viewPoint : Node -> Svg Never
+viewPoint : Node NodeData -> Svg Never
 viewPoint point =
   Svg.g []
     [ Svg.circle
-      [ SvgAttrib.cx <| toString point.position.x
-      , SvgAttrib.cy <| toString point.position.y
+      [ SvgAttrib.cx <| toString point.pos.x
+      , SvgAttrib.cy <| toString point.pos.y
       , SvgAttrib.r "15"
       , SvgAttrib.fill "white"
       , SvgAttrib.stroke "black"
@@ -170,8 +190,8 @@ viewPoint point =
       ]
       []
     , Svg.text_
-      [ SvgAttrib.x <| toString point.position.x
-      , SvgAttrib.y <| toString point.position.y
+      [ SvgAttrib.x <| toString point.pos.x
+      , SvgAttrib.y <| toString point.pos.y
       , SvgAttrib.textAnchor "middle"
       , SvgAttrib.alignmentBaseline "middle"
       ]
@@ -179,13 +199,13 @@ viewPoint point =
     ]
 
 
-viewEdge : { first : Node, second : Node, data : () } -> Svg Never
+viewEdge : { first : Node NodeData, second : Node NodeData, data : () } -> Svg Never
 viewEdge edge =
   Svg.line
-    [ SvgAttrib.x1 <| toString edge.first.position.x
-    , SvgAttrib.y1 <| toString edge.first.position.y
-    , SvgAttrib.x2 <| toString edge.second.position.x
-    , SvgAttrib.y2 <| toString edge.second.position.y
+    [ SvgAttrib.x1 <| toString edge.first.pos.x
+    , SvgAttrib.y1 <| toString edge.first.pos.y
+    , SvgAttrib.x2 <| toString edge.second.pos.x
+    , SvgAttrib.y2 <| toString edge.second.pos.y
     , SvgAttrib.stroke "black"
     ]
     []

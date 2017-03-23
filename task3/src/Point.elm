@@ -7,6 +7,10 @@ type alias Point =
   }
 
 
+zero : Point
+zero = { x = 0, y = 0 }
+
+
 (.+) : Point -> Point -> Point
 (.+) a b = { x = a.x + b.x, y = a.y + b.y }
 
