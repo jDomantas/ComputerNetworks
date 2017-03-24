@@ -1,13 +1,13 @@
-module Visualised exposing (Visualised, Node, simulate)
+module Visualised exposing (Visualised, Positioned, simulate)
 
 import Graph exposing (Graph)
 import Point exposing (Point, (.+), (.-), (.*), (./))
 
 
-type alias Node n = { n | pos : Point, v : Point, a : Point }
+type alias Positioned n = { n | pos : Point, v : Point, a : Point }
 
 
-type alias Visualised n e = Graph (Node n) e
+type alias Visualised n e = Graph (Positioned n) e
 
 
 repulsion : Float

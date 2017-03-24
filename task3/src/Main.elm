@@ -7,11 +7,12 @@ import Time
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttrib
 import Graph exposing (Graph)
-import Visualised exposing (Visualised, Node)
+import Visualised exposing (Visualised, Positioned)
 import Point exposing (Point)
+import Network
 
 
-type alias NodeData =
+type alias Node =
   { id : Int
   }
 
@@ -19,7 +20,7 @@ type alias NodeData =
 type alias Model =
   { width : Int
   , height : Int
-  , graph : Visualised NodeData ()
+  , graph : Visualised Node ()
   }
 
 
@@ -127,7 +128,7 @@ update msg model =
         { model | graph = updatedGraph }
 
 
-view : Model -> Html Msg
+view : Model -> Html a
 view model =
   let
     stylesheet =
@@ -145,7 +146,7 @@ view model =
       ]
 
 
-viewModel : Model -> Html Msg
+viewModel : Model -> Html a
 viewModel model =
   let
     width = toString model.width
@@ -166,18 +167,18 @@ viewModel model =
 
     items = edges ++ points ++ [ text ]
   in
-    Html.map never <| Svg.svg
+    Svg.svg
       [ SvgAttrib.viewBox <| "0 0 " ++ width ++ " " ++ height
       ]
       items
 
 
-viewPoints : List (Node NodeData) -> List (Svg Never)
+viewPoints : List (Positioned Node) -> List (Svg a)
 viewPoints =
   List.sortBy .id >> List.map viewPoint
 
 
-viewPoint : Node NodeData -> Svg Never
+viewPoint : Positioned Node -> Svg a
 viewPoint point =
   Svg.g []
     [ Svg.circle
@@ -199,7 +200,7 @@ viewPoint point =
     ]
 
 
-viewEdge : { first : Node NodeData, second : Node NodeData, data : () } -> Svg Never
+viewEdge : { first : Positioned Node, second : Positioned Node, data : () } -> Svg a
 viewEdge edge =
   Svg.line
     [ SvgAttrib.x1 <| toString edge.first.pos.x
