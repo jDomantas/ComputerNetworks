@@ -46,6 +46,7 @@ update msg table =
     , cost = msg.cost + entry.cost
     , hop = msg.sender
     }) msg.data)
+  |> List.sortBy .id
   |> List.Extra.groupWhile (\a b -> a.id == b.id)
   |> List.map (List.sortBy .cost)
   |> List.filterMap List.head
