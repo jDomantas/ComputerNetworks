@@ -3,7 +3,9 @@ module Graph exposing
   , empty, addNode, connect
   , findNode, findEdge
   , nodes, edges, neighbours
-  , mapNodes, mapEdges, filterNodes, filterEdges, anyNode, anyEdge
+  , mapNodes, mapEdges, mapFullEdges
+  , filterNodes, filterEdges, filterFullEdges
+  , anyNode, anyEdge
   )
 
 import List.Extra
@@ -138,6 +140,29 @@ mapEdges f (Graph graph) =
     Graph { graph | edges = edges }
 
 
+mapFullEdges : (Edge n e -> t) -> Graph n e -> Graph n t
+mapFullEdges f (Graph graph) =
+  let
+    fullEdge edge =
+      let
+      first = unsafeGetNode edge.first (Graph graph)
+      second = unsafeGetNode edge.second (Graph graph)
+    in
+      { first = first
+      , second = second
+      , data = edge.data
+      }
+
+    mapper edge =
+      let
+        data = f (fullEdge edge)
+      in
+        { edge | data = data }
+
+    edges = List.map mapper graph.edges
+  in
+    Graph { graph | edges = edges }
+
 filterNodes : (n -> Bool) -> Graph n e -> Graph n e
 filterNodes predicate (Graph graph) =
   let
@@ -157,6 +182,24 @@ filterEdges : (e -> Bool) -> Graph n e -> Graph n e
 filterEdges predicate (Graph graph) =
   let
     edges = List.filter (predicate << .data) graph.edges
+  in
+    Graph { graph | edges = edges }
+
+
+filterFullEdges : (Edge n e -> Bool) -> Graph n e -> Graph n e
+filterFullEdges predicate (Graph graph) =
+  let
+    fullEdge edge =
+      let
+      first = unsafeGetNode edge.first (Graph graph)
+      second = unsafeGetNode edge.second (Graph graph)
+    in
+      { first = first
+      , second = second
+      , data = edge.data
+      }
+
+    edges = List.filter (predicate << fullEdge) graph.edges
   in
     Graph { graph | edges = edges }
 
