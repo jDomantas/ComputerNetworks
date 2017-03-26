@@ -45,7 +45,7 @@ write line model =
 
 view : Model -> Html Msg
 view model =
-  Html.div []
+  Html.div [ Attrib.class "terminal" ]
     [ viewOutput model.output
     , viewInput model.input
     ]
@@ -57,7 +57,10 @@ viewOutput items =
     viewLine line =
       Html.p [] [ Html.text line ]
   in
-    Html.div [] <| List.map viewLine items
+    items
+    |> List.reverse
+    |> List.map viewLine
+    |> Html.div []
 
 
 viewInput : String -> Html Msg

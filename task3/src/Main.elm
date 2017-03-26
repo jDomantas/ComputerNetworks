@@ -117,7 +117,7 @@ update msg model =
     Tick ->
       let
         center =
-          { x = toFloat model.width / 2
+          { x = toFloat (model.width - 500) / 2
           , y = toFloat model.height / 2
           }
 
@@ -159,13 +159,15 @@ view model =
 viewModel : Model -> Html Msg
 viewModel model =
   let
-    size = Point (toFloat model.width) (toFloat model.height)
+    size = Point (toFloat (model.width - 500)) (toFloat model.height)
 
     terminal = Terminal.view model.terminal
 
     network = Network.view size model.simulation
   in
-    Html.div []
-      [ Html.map Terminal terminal
-      , network
+    Html.table []
+      [ Html.tr []
+        [ Html.td [] [ Html.map Terminal terminal ]
+        , Html.td [] [ network ]
+        ]
       ]

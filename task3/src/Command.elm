@@ -32,6 +32,7 @@ parser =
   |. maybeSpaces
   |= command
   |. maybeSpaces
+  |. Parser.end
 
 
 command : Parser Command

@@ -22,7 +22,8 @@ addNodeHelper id sim =
     newNode =
       { id = id
       , data = sim.init
-      , pos = Point.zero
+      -- a hack to shift nodes 'randomly', to prevent stacking
+      , pos = Point 0 (15 * (toFloat <| List.length <| Graph.nodes sim.network))
       , v = Point.zero
       , a = Point.zero
       }
