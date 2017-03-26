@@ -41,12 +41,12 @@ removeNodeHelper id sim =
 updateEdgeHelper : NodeId -> NodeId -> Maybe Int -> Simulation a b -> Simulation a b
 updateEdgeHelper id1 id2 cost sim =
   let
-    filter edge =
+    shouldFilter edge =
       (edge.first.id == id1 && edge.second.id == id2) ||
         (edge.first.id == id2 && edge.second.id == id1)
 
     withoutEdge =
-      Graph.filterFullEdges filter sim.network
+      Graph.filterFullEdges (not << shouldFilter) sim.network
   in
     case cost of
       Just cost ->
