@@ -1,4 +1,7 @@
-module Terminal exposing (Model, Msg)
+module Terminal exposing
+  ( Model, Msg
+  , init, update, write, view
+  )
 
 import Html exposing (Html)
 import Html.Attributes as Attrib

@@ -1,8 +1,17 @@
-module Network exposing (Sim)
+module Network exposing
+  ( Sim
+  , addNode, removeNode, updateEdge, markRoute
+  , distanceVector
+  , animate, view
+  )
 
 
-import Point
+import Html exposing (Html)
+import Svg exposing (Svg)
+import Svg.Attributes as SvgAttrib
+import Point exposing (Point)
 import Graph exposing (Graph)
+import Visualised exposing (Positioned)
 import NetworkCommon exposing (..)
 import DistanceVector
 
@@ -101,3 +110,90 @@ distanceVector =
     , route = DistanceVector.route
     , disconnect = DistanceVector.disconnect
     }
+
+
+animate : Float -> Point -> Sim -> Sim
+animate timestep center sim =
+  let
+    updateGraph = Visualised.simulate timestep center
+  in
+    case sim of
+      DistanceVector sim ->
+        DistanceVector { sim | network = updateGraph sim.network }
+
+
+simulationGraph : Sim -> Network ()
+simulationGraph sim =
+  let
+    nodeData node =
+      { pos = node.pos
+      , v = node.v
+      , a = node.a
+      , id = node.id
+      , data = ()
+      }
+  in
+    case sim of
+      DistanceVector sim ->
+        Graph.mapNodes nodeData sim.network
+
+
+view : Point -> Sim -> Html a
+view size sim =
+  let
+    graph = simulationGraph sim
+
+    points = viewPoints (Graph.nodes graph)
+
+    edges = List.map viewEdge (Graph.edges graph)
+
+    items = edges ++ points
+
+    width = toString size.x
+
+    height = toString size.y
+  in
+    Svg.svg
+      [ SvgAttrib.viewBox <| "0 0 " ++ width ++ " " ++ height
+      ]
+      items
+
+
+
+viewPoints : List (Positioned (Node ())) -> List (Svg a)
+viewPoints =
+  List.sortBy .id >> List.map viewPoint
+
+
+viewPoint : Positioned (Node ()) -> Svg a
+viewPoint point =
+  Svg.g []
+    [ Svg.circle
+      [ SvgAttrib.cx <| toString point.pos.x
+      , SvgAttrib.cy <| toString point.pos.y
+      , SvgAttrib.r "15"
+      , SvgAttrib.fill "white"
+      , SvgAttrib.stroke "black"
+      , SvgAttrib.strokeWidth "2"
+      ]
+      []
+    , Svg.text_
+      [ SvgAttrib.x <| toString point.pos.x
+      , SvgAttrib.y <| toString point.pos.y
+      , SvgAttrib.textAnchor "middle"
+      , SvgAttrib.alignmentBaseline "middle"
+      ]
+      [ Svg.text point.id ]
+    ]
+
+
+viewEdge : { first : Positioned (Node ()), second : Positioned (Node ()), data : EdgeData } -> Svg a
+viewEdge edge =
+  Svg.line
+    [ SvgAttrib.x1 <| toString edge.first.pos.x
+    , SvgAttrib.y1 <| toString edge.first.pos.y
+    , SvgAttrib.x2 <| toString edge.second.pos.x
+    , SvgAttrib.y2 <| toString edge.second.pos.y
+    , SvgAttrib.stroke "black"
+    ]
+    []
