@@ -19,7 +19,7 @@ damping = 0.7
 
 
 scale : Float
-scale = 100
+scale = 200
 
 
 simulate : Float -> Point -> Visualised n e -> Visualised n e

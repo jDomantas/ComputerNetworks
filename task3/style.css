@@ -15,8 +15,12 @@ svg {
 }
 
 .terminal {
-	height: 100%;
-	min-height: 100%;
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	/*height: 100%;
+	min-height: 100%;*/
 	width: 400px;
 	margin: 0;
   padding: 5px;
@@ -32,19 +36,12 @@ svg {
 	background: #ddd;
 }
 
-td {
-	padding: 0;
-	margin: 0;
-	vertical-align: top;
-}
-
-td:last-child {
-	width: 99%;
-}
-
-table {
-	margin: 0;
-	padding: 0;
+.graph {
+	position: fixed;
+	left: 400px;
+	right: 0;
+	top: 0;
+	bottom: 0;
 }
 
 svg {

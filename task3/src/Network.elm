@@ -7,6 +7,7 @@ module Network exposing
 
 
 import Html exposing (Html)
+import Html.Attributes
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttrib
 import Point exposing (Point)
@@ -23,7 +24,7 @@ addNodeHelper id sim =
       { id = id
       , data = sim.init
       -- a hack to shift nodes 'randomly', to prevent stacking
-      , pos = Point 0 (15 * (toFloat <| List.length <| Graph.nodes sim.network))
+      , pos = Point 0 (10 * (toFloat <| List.length <| Graph.nodes sim.network))
       , v = Point.zero
       , a = Point.zero
       }
@@ -154,10 +155,12 @@ view size sim =
 
     height = toString size.y
   in
-    Svg.svg
-      [ SvgAttrib.viewBox <| "0 0 " ++ width ++ " " ++ height
+    Html.div
+      [ Html.Attributes.class "graph " ]
+      [ Svg.svg
+          [ SvgAttrib.viewBox <| "0 0 " ++ width ++ " " ++ height ]
+          items
       ]
-      items
 
 
 
