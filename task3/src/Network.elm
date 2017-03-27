@@ -317,7 +317,7 @@ viewPoint point =
       ]
 
 
-viewEdge : Int -> { first : Positioned (Node ()), second : Positioned (Node ()), data : EdgeData } -> Svg a
+viewEdge : Int -> Graph.Edge (Positioned (Node ())) EdgeData -> Svg a
 viewEdge tick edge =
   let
     center = (edge.first.pos .+ edge.second.pos) ./ 2
