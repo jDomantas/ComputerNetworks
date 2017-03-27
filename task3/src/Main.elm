@@ -4,6 +4,8 @@ import Window
 import Task
 import Time
 import Random
+import Dom
+import Dom.Scroll
 import Point exposing (Point)
 import Network exposing (Sim)
 import Terminal
@@ -26,6 +28,7 @@ type Msg
   = UpdateSize (Maybe Int) (Maybe Int)
   | RandomUpdate Int
   | Tick
+  | NoOp
   | Terminal Terminal.Msg
 
 
@@ -55,9 +58,26 @@ init =
     tasks = Cmd.batch
       [ Task.perform (\w -> UpdateSize (Just w) Nothing) Window.width
       , Task.perform (\h -> UpdateSize Nothing (Just h)) Window.height
+      , Task.attempt (always NoOp) (Dom.focus "terminput")
       ]
   in
     (model, tasks)
+
+
+updateWithDom : Msg -> Model -> (Model, Cmd Msg)
+updateWithDom msg model =
+  let
+    (newModel, cmds) = update msg model
+  in
+    (newModel, Cmd.batch [ scrollAndFocusTerminal, cmds ])
+
+
+scrollAndFocusTerminal : Cmd Msg
+scrollAndFocusTerminal =
+  Cmd.batch
+    [ Task.attempt (always NoOp) (Dom.focus "terminput")
+    , Task.attempt (always NoOp) (Dom.Scroll.toBottom "terminal")
+    ]
 
 
 subscriptions : Model -> Sub Msg
@@ -142,6 +162,9 @@ applyCommand cmd model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
+    NoOp ->
+      model ! []
+
     UpdateSize width height ->
       let
         newWidth = Maybe.withDefault model.width width
@@ -169,7 +192,7 @@ update msg model =
         tickChange = if model.tickProgress >= 1 then 1 else 0
 
         commands =
-          if model.tickProgress >= 1 && model.tick % 5 == 0 then
+          if model.tickProgress >= 1 then
             [ Random.generate RandomUpdate (Random.int 0 1000000000) ]
           else
             []
@@ -177,7 +200,7 @@ update msg model =
         { model
           | simulation = markRoute updatedSimulation
           , tick = model.tick + tickChange
-          , tickProgress = model.tickProgress - tickChange + 0.15
+          , tickProgress = model.tickProgress - tickChange + 0.2
           } ! commands
 
     RandomUpdate value ->
@@ -196,7 +219,8 @@ update msg model =
           |> Maybe.map applyCommand
           |> Maybe.withDefault identity
       in
-        runCommand { model | terminal = terminal } ! []
+        runCommand { model | terminal = terminal }
+          ! [ Task.attempt (always NoOp) (Dom.Scroll.toBottom "terminal") ]
 
 
 view : Model -> Html Msg

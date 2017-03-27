@@ -50,7 +50,7 @@ update msg model =
     validEntry entry =
       entry.id /= model.myId
       && entry.hop /= model.myId
-      && entry.cost < 200
+      && entry.cost < 100
 
     table =
       model.table

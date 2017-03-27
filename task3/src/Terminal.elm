@@ -46,7 +46,10 @@ write line model =
 
 view : Model -> Html Msg
 view model =
-  Html.div [ Attrib.class "terminal" ]
+  Html.div
+    [ Attrib.class "terminal"
+    , Attrib.id "terminal"
+    ]
     [ viewOutput model.output
     , viewInput model.input
     ]
@@ -72,6 +75,7 @@ viewInput input =
   Html.input
     [ Attrib.type_ "text"
     , Attrib.value input
+    , Attrib.id "terminput"
     , Events.onInput Input
     , onEnter Enter
     ]
