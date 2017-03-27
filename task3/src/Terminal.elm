@@ -3,6 +3,7 @@ module Terminal exposing
   , init, update, write, view
   )
 
+import Regex
 import Html exposing (Html)
 import Html.Attributes as Attrib
 import Html.Events as Events
@@ -54,8 +55,11 @@ view model =
 viewOutput : List String -> Html a
 viewOutput items =
   let
+    fixSpaces =
+      Regex.replace Regex.All (Regex.regex " ") (always "\x00A0")
+
     viewLine line =
-      Html.p [] [ Html.text line ]
+      Html.p [] [ Html.text (fixSpaces line) ]
   in
     items
     |> List.reverse

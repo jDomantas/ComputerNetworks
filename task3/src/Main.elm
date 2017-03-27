@@ -116,7 +116,6 @@ applyCommand cmd model =
       let
         data =
           Network.viewNode node model.simulation
-          |> Maybe.map (\l -> ("Data in node " ++ node) :: l)
           |> Maybe.withDefault [ "Node " ++ node ++ " does not exist" ]
         
         term =

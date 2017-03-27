@@ -93,9 +93,17 @@ disconnect id model =
 
 
 view : Model -> List String
-view =
+view model =
   let
+    formatRow destination hop cost =
+      "| " ++ (String.pad 4 ' ' destination) ++
+      " | " ++ (Debug.log "padded" <| String.pad 4 ' ' hop) ++
+      " | " ++ (String.pad 4 ' ' cost) ++ " |"
+    
     formatEntry entry =
-      "To '" ++ entry.id ++ "' through '" ++ entry.hop ++ "', cost: " ++ toString entry.cost
+      formatRow entry.id entry.hop (toString entry.cost)
   in
-    .table >> List.map formatEntry
+    [ "| Node " ++ model.myId
+    , formatRow "dest" "hop" "cost"
+    , "+------+------+------+"
+    ] ++ List.map formatEntry model.table
