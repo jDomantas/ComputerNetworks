@@ -328,7 +328,7 @@ viewEdge tick edge =
 
     width =
       usedBefore
-      |> Maybe.map (\b -> max 1 (6 - b))
+      |> Maybe.map (\b -> max 1 (6 - b // 2))
       |> Maybe.withDefault 1
   in
     Svg.g []

@@ -168,7 +168,7 @@ update msg model =
         { model
           | simulation = markRoute updatedSimulation
           , tick = model.tick + tickChange
-          , tickProgress = model.tickProgress - tickChange + 0.1
+          , tickProgress = model.tickProgress - tickChange + 0.2
           }
 
     Terminal msg ->
