@@ -79,6 +79,8 @@ applyCommand cmd model =
       { model
         | simulation = Network.removeNode node model.simulation
         , terminal = Terminal.write ("Removed node " ++ node) model.terminal
+        , start = if Just node == model.start then Nothing else model.start
+        , end = if Just node == model.end then Nothing else model.end
         }
 
     Ok (Command.UpdateEdge start end cost) ->
@@ -157,7 +159,7 @@ update msg model =
           Network.animate (1 / 10.0) model.tick center model.simulation
 
         markRoute =
-          if model.tick % 5 == 0 then
+          if model.tick % 10 == 0 then
             Maybe.map3 Network.markRoute model.start model.end (Just model.tick)
             |> Maybe.withDefault identity
           else
@@ -168,7 +170,7 @@ update msg model =
         { model
           | simulation = markRoute updatedSimulation
           , tick = model.tick + tickChange
-          , tickProgress = model.tickProgress - tickChange + 0.2
+          , tickProgress = model.tickProgress - tickChange + 0.15
           }
 
     Terminal msg ->
@@ -208,7 +210,7 @@ viewModel model =
 
     terminal = Terminal.view model.terminal
 
-    network = Network.view size model.tick model.simulation
+    network = Network.view size model.tick model.start model.end model.simulation
   in
     Html.div []
       [ Html.map Terminal terminal

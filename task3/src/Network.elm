@@ -260,12 +260,20 @@ simulationGraph sim =
         Graph.mapNodes nodeData sim.network
 
 
-view : Point -> Int -> Sim -> Html a
-view size tick sim =
+view : Point -> Int -> Maybe NodeId -> Maybe NodeId -> Sim -> Html a
+view size tick start end sim =
   let
     graph = simulationGraph sim
 
-    points = viewPoints (Graph.nodes graph)
+    pickType id =
+      if Just id == start then
+        Start
+      else if Just id == end then
+        End
+      else
+        Normal
+
+    points = viewPoints pickType (Graph.nodes graph)
 
     edges = List.map (viewEdge tick) (Graph.edges graph)
 
@@ -283,18 +291,31 @@ view size tick sim =
       ]
 
 
-
-viewPoints : List (Positioned (Node ())) -> List (Svg a)
-viewPoints =
-  List.sortBy .id >> List.map viewPoint
+type PointType = Start | End | Normal
 
 
-viewPoint : Positioned (Node ()) -> Svg a
-viewPoint point =
+viewPoints : (NodeId -> PointType) -> List (Positioned (Node ())) -> List (Svg a)
+viewPoints pickType =
+  List.sortBy .id >> List.map (\p -> viewPoint (pickType p.id) p)
+
+
+viewPoint : PointType -> Positioned (Node ()) -> Svg a
+viewPoint typ point =
   let
     size = { x = 50, y = 30 }
 
     start = point.pos .- (size ./ 2)
+
+    color =
+      case typ of
+        Start ->
+          "#ddf"
+        
+        End ->
+          "#fdd"
+        
+        Normal ->
+          "white"
   in
     Svg.g []
       [ Svg.rect
@@ -302,7 +323,7 @@ viewPoint point =
         , SvgAttrib.y <| toString start.y
         , SvgAttrib.width <| toString size.x
         , SvgAttrib.height <| toString size.y
-        , SvgAttrib.fill "white"
+        , SvgAttrib.fill color
         , SvgAttrib.stroke "black"
         , SvgAttrib.strokeWidth "2"
         ]
