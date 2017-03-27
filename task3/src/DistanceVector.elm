@@ -1,6 +1,6 @@
 module DistanceVector exposing
-  ( Sim, Table, Msg
-  , init, update, announce, route, disconnect
+  ( Sim, Model, Msg
+  , init, update, announce, route, disconnect, view
   )
 
 import NetworkCommon exposing (NodeId, Message, Simulation)
@@ -13,7 +13,11 @@ type alias TableEntry =
   , hop : NodeId
   }
 
-type alias Table = List TableEntry
+
+type alias Model =
+  { myId : NodeId
+  , table : List TableEntry
+  }
 
 
 type alias MsgEntry =
@@ -25,49 +29,73 @@ type alias MsgEntry =
 type alias Msg = List MsgEntry
 
 
-type alias Sim = Simulation Table Msg
+type alias Sim = Simulation Model Msg
 
 
 -- at the start routing table is empty
-init : Table
-init = []
+init : NodeId -> Model
+init id =
+  { myId = id
+  , table = []
+  }
 
 
 -- updating:
 --   clear all previous routes that go through sender
 --   add new routes going through sender
 --   for each destination, keep only best route
-update : Message Msg -> Table -> Table
-update msg table =
-  table
-  |> List.filter (\entry -> entry.hop /= msg.sender)
-  |> List.append (List.map (\entry ->
-    { id = entry.id
-    , cost = msg.cost + entry.cost
-    , hop = msg.sender
-    }) msg.data)
-  |> List.sortBy .id
-  |> List.Extra.groupWhile (\a b -> a.id == b.id)
-  |> List.map (List.sortBy .cost)
-  |> List.filterMap List.head
+update : Message Msg -> Model -> Model
+update msg model =
+  let
+    validEntry entry =
+      entry.id /= model.myId
+      && entry.hop /= model.myId
+      && entry.cost < 200
+
+    table =
+      model.table
+      |> List.filter (\entry -> entry.hop /= msg.sender)
+      |> List.append (List.map (\entry ->
+        { id = entry.id
+        , cost = msg.cost + entry.cost
+        , hop = msg.sender
+        }) msg.data)
+      -- add direct route to sender
+      |> (::) { id = msg.sender, cost = msg.cost, hop = msg.sender }
+      |> List.sortBy .id
+      |> List.Extra.groupWhile (\a b -> a.id == b.id)
+      |> List.map (List.sortBy .cost)
+      |> List.filterMap List.head
+      |> List.filter validEntry
+  in
+    { model | table = table }
   
 
 -- to announce send all table to neighbour
-announce : Table -> Msg
+announce : Model -> Msg
 announce =
-  List.map (\entry -> MsgEntry entry.id entry.cost)
+  .table >> List.map (\entry -> MsgEntry entry.id entry.cost)
 
 
 -- routing is just looking up that destination in routing table
-route : Table -> NodeId -> Maybe NodeId
-route table id =
-  table
+route : Model -> NodeId -> Maybe NodeId
+route model id =
+  model.table
   |> List.Extra.find (\entry -> entry.id == id)
   |> Maybe.map .hop
 
 
 -- when neighbour node is disconnected, remove
 -- all paths that are known to go through it
-disconnect : NodeId -> Table -> Table
-disconnect id =
-  List.filter (\entry -> entry.hop /= id)
+disconnect : NodeId -> Model -> Model
+disconnect id model =
+  { model | table = List.filter (\entry -> entry.hop /= id) model.table }
+
+
+view : Model -> List String
+view =
+  let
+    formatEntry entry =
+      "To '" ++ entry.id ++ "' through '" ++ entry.hop ++ "', cost: " ++ toString entry.cost
+  in
+    .table >> List.map formatEntry

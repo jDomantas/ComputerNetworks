@@ -1,6 +1,6 @@
 module Network exposing
   ( Sim
-  , addNode, removeNode, updateEdge, markRoute
+  , addNode, removeNode, updateEdge, markRoute, viewNode
   , distanceVector
   , animate, view
   )
@@ -10,6 +10,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttrib
+import List.Extra
 import Point exposing (Point, (.+), (.-), (.*), (./))
 import Graph exposing (Graph)
 import Visualised exposing (Positioned)
@@ -22,7 +23,7 @@ addNodeHelper id sim =
   let
     newNode =
       { id = id
-      , data = sim.init
+      , data = sim.init id
       -- a hack to shift nodes 'randomly', to prevent stacking
       , pos = Point 0 (10 * (toFloat <| List.length <| Graph.nodes sim.network))
       , v = Point.zero
@@ -37,7 +38,18 @@ addNodeHelper id sim =
 
 removeNodeHelper : NodeId -> Simulation a b -> Simulation a b
 removeNodeHelper id sim =
-  { sim | network = Graph.filterNodes (\n -> n.id /= id) sim.network }
+  let
+    neighbours =
+      Graph.neighbours (\n -> n.id == id) sim.network
+      |> Maybe.withDefault []
+      |> List.map (\(node, _) -> node.id)
+    
+    -- remove neighbours before with edge removal function,
+    -- to correctly announce disconnects
+    withoutNeighbours =
+      List.foldl (\n sim -> updateEdgeHelper id n Nothing sim) sim neighbours
+  in
+    { sim | network = Graph.filterNodes (\n -> n.id /= id) withoutNeighbours.network }
 
 
 updateEdgeHelper : NodeId -> NodeId -> Maybe Int -> Simulation a b -> Simulation a b
@@ -49,6 +61,9 @@ updateEdgeHelper id1 id2 cost sim =
 
     withoutEdge =
       Graph.filterFullEdges (not << shouldFilter) sim.network
+
+    hasRemoved =
+      List.length (Graph.edges withoutEdge) < List.length (Graph.edges sim.network)
   in
     case cost of
       Just cost ->
@@ -63,11 +78,66 @@ updateEdgeHelper id1 id2 cost sim =
           { sim | network = withUpdatedEdge }
 
       Nothing ->
-        { sim | network = withoutEdge }
+        let
+          network =
+            if hasRemoved then
+              Graph.mapNodes (\node ->
+                if node.id == id1 then
+                  { node | data = sim.disconnect id2 node.data }
+                else if node.id == id2 then
+                  { node | data = sim.disconnect id1 node.data }
+                else
+                  node) withoutEdge
+            else
+              withoutEdge
+        in
+          { sim | network = network }
 
 
 markRouteHelper : NodeId -> NodeId -> Int -> Simulation a b -> Simulation a b
 markRouteHelper start end time sim = Debug.crash "not implemented"
+
+
+sendMessages : NodeId -> Simulation a b -> Simulation a b
+sendMessages source sim =
+  let
+    msg =
+      Graph.findNode (\n -> n.id == source) sim.network
+      |> Maybe.map (\node -> sim.announce node.data)
+
+    receivers =
+      Graph.neighbours (\n -> n.id == source) sim.network
+      |> Maybe.withDefault []
+      |> List.filterMap (\(node, edge) ->
+        msg |> Maybe.map (\payload ->
+          let
+            msg =
+              { data = payload
+              , sender = source
+              , cost = edge.cost
+              }
+          in
+            (msg, node.id)))
+
+    updated =
+      List.foldl (\(msg, recv) sim ->
+        let
+          updated =
+            Graph.mapNodes (\node ->
+              if node.id == recv then
+                { node | data = sim.update msg node.data }
+              else
+                node) sim.network
+        in
+          { sim | network = updated }) sim receivers
+  in
+    updated
+
+
+viewNodeHelper : NodeId -> Simulation a b -> Maybe (List String)
+viewNodeHelper id sim =
+  Graph.findNode (\n -> n.id == id) sim.network
+  |> Maybe.map (\node -> sim.view node.data)
 
 
 type Sim
@@ -102,6 +172,13 @@ markRoute start end time sim =
       DistanceVector (markRouteHelper start end time sim)
 
 
+viewNode : NodeId -> Sim -> Maybe (List String)
+viewNode node sim =
+  case sim of
+    DistanceVector sim ->
+      viewNodeHelper node sim
+
+
 distanceVector : Sim
 distanceVector =
   DistanceVector
@@ -111,17 +188,27 @@ distanceVector =
     , announce = DistanceVector.announce
     , route = DistanceVector.route
     , disconnect = DistanceVector.disconnect
+    , view = DistanceVector.view
     }
 
 
-animate : Float -> Point -> Sim -> Sim
-animate timestep center sim =
+animate : Float -> Int -> Point -> Sim -> Sim
+animate timestep tick center sim =
   let
-    updateGraph = Visualised.simulate timestep center
+    send sim =
+      Graph.nodes sim.network
+      |> (\nodes -> List.Extra.getAt (tick % (max 1 <| List.length nodes)) nodes)
+      |> Maybe.map (\source -> sendMessages source.id sim)
+      |> Maybe.withDefault sim
+
+    updateVisual sim =
+      { sim
+        | network = Visualised.simulate timestep center sim.network
+        }
   in
     case sim of
       DistanceVector sim ->
-        DistanceVector { sim | network = updateGraph sim.network }
+        DistanceVector (sim |> updateVisual |> send)
 
 
 simulationGraph : Sim -> Network ()
@@ -228,4 +315,3 @@ viewEdge edge =
         ]
         [ Svg.text <| toString edge.data.cost ]
       ]
-

@@ -30,9 +30,10 @@ type alias Network a = Visualised (Node a) EdgeData
 
 type alias Simulation a b =
   { network : Network a
-  , init : a
+  , init : NodeId -> a
   , update : Message b -> a -> a
   , announce : a -> b
   , route : a -> NodeId -> Maybe NodeId
   , disconnect : NodeId -> a -> a
+  , view : a -> List String
   }

@@ -12,6 +12,8 @@ import Command exposing (Command)
 type alias Model =
   { width : Int
   , height : Int
+  , tick : Int
+  , tickProgress : Float
   , simulation : Sim
   , terminal : Terminal.Model
   }
@@ -38,6 +40,8 @@ init =
     model =
       { width = 600
       , height = 100
+      , tick = 0
+      , tickProgress = 0
       , simulation = Network.distanceVector
       , terminal = Terminal.init
       }
@@ -88,6 +92,18 @@ applyCommand cmd model =
           , terminal = Terminal.write msg model.terminal
           }
 
+    Ok (Command.ViewNode node) ->
+      let
+        data =
+          Network.viewNode node model.simulation
+          |> Maybe.map (\l -> ("Data in node " ++ node) :: l)
+          |> Maybe.withDefault [ "Node " ++ node ++ " does not exist" ]
+        
+        term =
+          List.foldl (\line term -> Terminal.write line term) model.terminal data
+      in
+        { model | terminal = term }
+
     Ok cmd ->
       let
         msg = "Command not implemented: " ++ toString cmd
@@ -122,9 +138,15 @@ update msg model =
           }
 
         updatedSimulation =
-          Network.animate (1 / 10.0) center model.simulation
+          Network.animate (1 / 10.0) model.tick center model.simulation
+
+        tickChange = if model.tickProgress >= 1 then 1 else 0
       in
-        { model | simulation = updatedSimulation }
+        { model
+          | simulation = updatedSimulation
+          , tick = model.tick + tickChange
+          , tickProgress = model.tickProgress - tickChange + 0.1
+          }
 
     Terminal msg ->
       let
