@@ -95,7 +95,40 @@ updateEdgeHelper id1 id2 cost sim =
 
 
 markRouteHelper : NodeId -> NodeId -> Int -> Simulation a b -> Simulation a b
-markRouteHelper start end time sim = Debug.crash "not implemented"
+markRouteHelper start end time sim =
+  let
+    markEdge : NodeId -> NodeId -> Simulation a b -> Simulation a b
+    markEdge from to sim =
+      let
+        graph =
+          Graph.mapFullEdges (\edge ->
+            if (edge.first.id == from && edge.second.id == to) ||
+              (edge.first.id == to && edge.second.id == from) then
+              { cost = edge.data.cost, lastTravel = Just time }
+            else
+              edge.data) sim.network
+      in
+        { sim | network = graph }
+
+    mark : NodeId -> NodeId -> Int -> Simulation a b -> Simulation a b
+    mark start end steps sim =
+      if steps == 0 || start == end then
+        sim
+      else
+        let
+          current =
+            Graph.findNode (\n -> n.id == start) sim.network
+          
+          nextHop =
+            current
+            |> Maybe.map .data
+            |> Maybe.andThen (flip sim.route end)
+        in
+          Maybe.map3 markEdge (Maybe.map .id current) nextHop (Just sim)
+          |> Maybe.map4 mark nextHop (Just end) (Just (steps - 1))
+          |> Maybe.withDefault sim
+  in
+    mark start end 10 sim
 
 
 sendMessages : NodeId -> Simulation a b -> Simulation a b
@@ -227,14 +260,14 @@ simulationGraph sim =
         Graph.mapNodes nodeData sim.network
 
 
-view : Point -> Sim -> Html a
-view size sim =
+view : Point -> Int -> Sim -> Html a
+view size tick sim =
   let
     graph = simulationGraph sim
 
     points = viewPoints (Graph.nodes graph)
 
-    edges = List.map viewEdge (Graph.edges graph)
+    edges = List.map (viewEdge tick) (Graph.edges graph)
 
     items = edges ++ points
 
@@ -284,10 +317,19 @@ viewPoint point =
       ]
 
 
-viewEdge : { first : Positioned (Node ()), second : Positioned (Node ()), data : EdgeData } -> Svg a
-viewEdge edge =
+viewEdge : Int -> { first : Positioned (Node ()), second : Positioned (Node ()), data : EdgeData } -> Svg a
+viewEdge tick edge =
   let
     center = (edge.first.pos .+ edge.second.pos) ./ 2
+
+    usedBefore =
+      edge.data.lastTravel
+      |> Maybe.map (\t -> tick - t)
+
+    width =
+      usedBefore
+      |> Maybe.map (\b -> max 1 (6 - b))
+      |> Maybe.withDefault 1
   in
     Svg.g []
       [ Svg.line
@@ -296,6 +338,7 @@ viewEdge edge =
         , SvgAttrib.x2 <| toString edge.second.pos.x
         , SvgAttrib.y2 <| toString edge.second.pos.y
         , SvgAttrib.stroke "black"
+        , SvgAttrib.strokeWidth <| toString width
         ]
         []
       , Svg.circle

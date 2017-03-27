@@ -14,6 +14,8 @@ type alias Model =
   , height : Int
   , tick : Int
   , tickProgress : Float
+  , start : Maybe String
+  , end : Maybe String
   , simulation : Sim
   , terminal : Terminal.Model
   }
@@ -42,6 +44,8 @@ init =
       , height = 100
       , tick = 0
       , tickProgress = 0
+      , start = Nothing
+      , end = Nothing
       , simulation = Network.distanceVector
       , terminal = Terminal.init
       }
@@ -92,6 +96,18 @@ applyCommand cmd model =
           , terminal = Terminal.write msg model.terminal
           }
 
+    Ok (Command.SetStart node) ->
+      { model
+        | start = Just node
+        , terminal = Terminal.write ("New start node: " ++ node) model.terminal
+        }
+
+    Ok (Command.SetEnd node) ->
+      { model
+        | end = Just node
+        , terminal = Terminal.write ("New end node: " ++ node) model.terminal
+        }
+
     Ok (Command.ViewNode node) ->
       let
         data =
@@ -140,10 +156,17 @@ update msg model =
         updatedSimulation =
           Network.animate (1 / 10.0) model.tick center model.simulation
 
+        markRoute =
+          if model.tick % 5 == 0 then
+            Maybe.map3 Network.markRoute model.start model.end (Just model.tick)
+            |> Maybe.withDefault identity
+          else
+            identity
+
         tickChange = if model.tickProgress >= 1 then 1 else 0
       in
         { model
-          | simulation = updatedSimulation
+          | simulation = markRoute updatedSimulation
           , tick = model.tick + tickChange
           , tickProgress = model.tickProgress - tickChange + 0.1
           }
@@ -185,7 +208,7 @@ viewModel model =
 
     terminal = Terminal.view model.terminal
 
-    network = Network.view size model.simulation
+    network = Network.view size model.tick model.simulation
   in
     Html.div []
       [ Html.map Terminal terminal
