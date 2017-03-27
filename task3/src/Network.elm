@@ -10,7 +10,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttrib
-import Point exposing (Point)
+import Point exposing (Point, (.+), (.-), (.*), (./))
 import Graph exposing (Graph)
 import Visualised exposing (Positioned)
 import NetworkCommon exposing (..)
@@ -171,33 +171,61 @@ viewPoints =
 
 viewPoint : Positioned (Node ()) -> Svg a
 viewPoint point =
-  Svg.g []
-    [ Svg.circle
-      [ SvgAttrib.cx <| toString point.pos.x
-      , SvgAttrib.cy <| toString point.pos.y
-      , SvgAttrib.r "15"
-      , SvgAttrib.fill "white"
-      , SvgAttrib.stroke "black"
-      , SvgAttrib.strokeWidth "2"
+  let
+    size = { x = 50, y = 30 }
+
+    start = point.pos .- (size ./ 2)
+  in
+    Svg.g []
+      [ Svg.rect
+        [ SvgAttrib.x <| toString start.x
+        , SvgAttrib.y <| toString start.y
+        , SvgAttrib.width <| toString size.x
+        , SvgAttrib.height <| toString size.y
+        , SvgAttrib.fill "white"
+        , SvgAttrib.stroke "black"
+        , SvgAttrib.strokeWidth "2"
+        ]
+        []
+      , Svg.text_
+        [ SvgAttrib.x <| toString point.pos.x
+        , SvgAttrib.y <| toString point.pos.y
+        , SvgAttrib.textAnchor "middle"
+        , SvgAttrib.alignmentBaseline "middle"
+        ]
+        [ Svg.text point.id ]
       ]
-      []
-    , Svg.text_
-      [ SvgAttrib.x <| toString point.pos.x
-      , SvgAttrib.y <| toString point.pos.y
-      , SvgAttrib.textAnchor "middle"
-      , SvgAttrib.alignmentBaseline "middle"
-      ]
-      [ Svg.text point.id ]
-    ]
 
 
 viewEdge : { first : Positioned (Node ()), second : Positioned (Node ()), data : EdgeData } -> Svg a
 viewEdge edge =
-  Svg.line
-    [ SvgAttrib.x1 <| toString edge.first.pos.x
-    , SvgAttrib.y1 <| toString edge.first.pos.y
-    , SvgAttrib.x2 <| toString edge.second.pos.x
-    , SvgAttrib.y2 <| toString edge.second.pos.y
-    , SvgAttrib.stroke "black"
-    ]
-    []
+  let
+    center = (edge.first.pos .+ edge.second.pos) ./ 2
+  in
+    Svg.g []
+      [ Svg.line
+        [ SvgAttrib.x1 <| toString edge.first.pos.x
+        , SvgAttrib.y1 <| toString edge.first.pos.y
+        , SvgAttrib.x2 <| toString edge.second.pos.x
+        , SvgAttrib.y2 <| toString edge.second.pos.y
+        , SvgAttrib.stroke "black"
+        ]
+        []
+      , Svg.circle
+        [ SvgAttrib.cx <| toString center.x
+        , SvgAttrib.cy <| toString center.y
+        , SvgAttrib.r "12"
+        , SvgAttrib.fill "white"
+        , SvgAttrib.stroke "black"
+        , SvgAttrib.strokeWidth "2"
+        ]
+        []
+      , Svg.text_
+        [ SvgAttrib.x <| toString center.x
+        , SvgAttrib.y <| toString (center.y + 1)
+        , SvgAttrib.textAnchor "middle"
+        , SvgAttrib.alignmentBaseline "middle"
+        ]
+        [ Svg.text <| toString edge.data.cost ]
+      ]
+
