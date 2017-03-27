@@ -156,7 +156,7 @@ update msg model =
           }
 
         updatedSimulation =
-          Network.animate (1 / 10.0) model.tick center model.simulation
+          Network.update (1 / 10.0) model.tick center model.simulation
 
         markRoute =
           if model.tick % 10 == 0 then

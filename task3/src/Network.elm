@@ -2,7 +2,7 @@ module Network exposing
   ( Sim
   , addNode, removeNode, updateEdge, markRoute, viewNode
   , distanceVector
-  , animate, view
+  , update, view
   )
 
 
@@ -225,8 +225,8 @@ distanceVector =
     }
 
 
-animate : Float -> Int -> Point -> Sim -> Sim
-animate timestep tick center sim =
+update : Float -> Int -> Point -> Sim -> Sim
+update timestep tick center sim =
   let
     send sim =
       Graph.nodes sim.network
