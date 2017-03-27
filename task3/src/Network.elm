@@ -2,7 +2,7 @@ module Network exposing
   ( Sim
   , addNode, removeNode, updateEdge, markRoute, viewNode
   , distanceVector
-  , update, view
+  , update, animate, view
   )
 
 
@@ -225,23 +225,35 @@ distanceVector =
     }
 
 
-update : Float -> Int -> Point -> Sim -> Sim
-update timestep tick center sim =
+update : Int -> Sim -> Sim
+update randomValue sim =
   let
+    pickRandom list =
+      let
+        index = randomValue % (max 1 (List.length list))
+      in
+        List.Extra.getAt index list
+
     send sim =
       Graph.nodes sim.network
-      |> (\nodes -> List.Extra.getAt (tick % (max 1 <| List.length nodes)) nodes)
+      |> pickRandom
       |> Maybe.map (\source -> sendMessages source.id sim)
       |> Maybe.withDefault sim
-
-    updateVisual sim =
-      { sim
-        | network = Visualised.simulate timestep center sim.network
-        }
   in
     case sim of
       DistanceVector sim ->
-        DistanceVector (sim |> updateVisual |> send)
+        DistanceVector (send sim)
+
+
+animate : Float -> Point -> Sim -> Sim
+animate timestep center sim =
+  let
+    updateVisual sim =
+      { sim | network = Visualised.simulate timestep center sim.network }
+  in
+    case sim of
+      DistanceVector sim ->
+        DistanceVector (updateVisual sim)
 
 
 simulationGraph : Sim -> Network ()

@@ -3,6 +3,7 @@ import Html.Attributes as HtmlAttrib
 import Window
 import Task
 import Time
+import Random
 import Point exposing (Point)
 import Network exposing (Sim)
 import Terminal
@@ -23,6 +24,7 @@ type alias Model =
 
 type Msg
   = UpdateSize (Maybe Int) (Maybe Int)
+  | RandomUpdate Int
   | Tick
   | Terminal Terminal.Msg
 
@@ -30,7 +32,7 @@ type Msg
 main : Program Never Model Msg
 main = Html.program
   { init = init
-  , update = \msg model -> (update msg model, Cmd.none)
+  , update = update
   , view = view
   , subscriptions = subscriptions
   }
@@ -138,7 +140,7 @@ applyCommand cmd model =
         { model | terminal = term }
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     UpdateSize width height ->
@@ -146,7 +148,7 @@ update msg model =
         newWidth = Maybe.withDefault model.width width
         newHeight = Maybe.withDefault model.height height
       in
-        { model | width = newWidth, height = newHeight }
+        { model | width = newWidth, height = newHeight } ! []
 
     Tick ->
       let
@@ -156,7 +158,7 @@ update msg model =
           }
 
         updatedSimulation =
-          Network.update (1 / 10.0) model.tick center model.simulation
+          Network.animate (1 / 10.0) center model.simulation
 
         markRoute =
           if model.tick % 10 == 0 then
@@ -166,12 +168,25 @@ update msg model =
             identity
 
         tickChange = if model.tickProgress >= 1 then 1 else 0
+
+        commands =
+          if model.tickProgress >= 1 && model.tick % 5 == 0 then
+            [ Random.generate RandomUpdate (Random.int 0 1000000000) ]
+          else
+            []
       in
         { model
           | simulation = markRoute updatedSimulation
           , tick = model.tick + tickChange
           , tickProgress = model.tickProgress - tickChange + 0.15
-          }
+          } ! commands
+
+    RandomUpdate value ->
+      let
+        updatedSimulation =
+          Network.update model.tick model.simulation
+      in
+        { model | simulation = updatedSimulation } ! []
 
     Terminal msg ->
       let
@@ -182,7 +197,7 @@ update msg model =
           |> Maybe.map applyCommand
           |> Maybe.withDefault identity
       in
-        runCommand { model | terminal = terminal }
+        runCommand { model | terminal = terminal } ! []
 
 
 view : Model -> Html Msg
