@@ -12811,7 +12811,7 @@ var _user$project$NetworkCommon$Message = F3(
 	});
 var _user$project$NetworkCommon$EdgeData = F2(
 	function (a, b) {
-		return {cost: a, lastTravel: b};
+		return {cost: a, travels: b};
 	});
 var _user$project$NetworkCommon$Node = F2(
 	function (a, b) {
@@ -12990,57 +12990,75 @@ var _user$project$DistanceVector$announce = function (_p0) {
 			return _.table;
 		}(_p0));
 };
-var _user$project$Network$viewEdge = F2(
-	function (tick, edge) {
-		var usedBefore = A2(
-			_elm_lang$core$Maybe$map,
-			function (t) {
-				return tick - t;
-			},
-			edge.data.lastTravel);
-		var width = A2(
-			_elm_lang$core$Maybe$withDefault,
-			1,
-			A2(
-				_elm_lang$core$Maybe$map,
-				function (b) {
-					return A2(_elm_lang$core$Basics$max, 1, 6 - ((b / 2) | 0));
-				},
-				usedBefore));
-		var center = A2(
-			_user$project$Point_ops['./'],
-			A2(_user$project$Point_ops['.+'], edge.first.pos, edge.second.pos),
-			2);
-		return A2(
-			_elm_lang$svg$Svg$g,
-			{ctor: '[]'},
-			{
-				ctor: '::',
-				_0: A2(
-					_elm_lang$svg$Svg$line,
-					{
+var _user$project$Network$viewEdge = function (edge) {
+	var color = (_elm_lang$core$Native_Utils.cmp(edge.data.travels, 0) > 0) ? 'blue' : 'black';
+	var width = (_elm_lang$core$Native_Utils.cmp(edge.data.travels, 0) > 0) ? (edge.data.travels + 5) : 1;
+	var center = A2(
+		_user$project$Point_ops['./'],
+		A2(_user$project$Point_ops['.+'], edge.first.pos, edge.second.pos),
+		2);
+	return A2(
+		_elm_lang$svg$Svg$g,
+		{ctor: '[]'},
+		{
+			ctor: '::',
+			_0: A2(
+				_elm_lang$svg$Svg$line,
+				{
+					ctor: '::',
+					_0: _elm_lang$svg$Svg_Attributes$x1(
+						_elm_lang$core$Basics$toString(edge.first.pos.x)),
+					_1: {
 						ctor: '::',
-						_0: _elm_lang$svg$Svg_Attributes$x1(
-							_elm_lang$core$Basics$toString(edge.first.pos.x)),
+						_0: _elm_lang$svg$Svg_Attributes$y1(
+							_elm_lang$core$Basics$toString(edge.first.pos.y)),
 						_1: {
 							ctor: '::',
-							_0: _elm_lang$svg$Svg_Attributes$y1(
-								_elm_lang$core$Basics$toString(edge.first.pos.y)),
+							_0: _elm_lang$svg$Svg_Attributes$x2(
+								_elm_lang$core$Basics$toString(edge.second.pos.x)),
 							_1: {
 								ctor: '::',
-								_0: _elm_lang$svg$Svg_Attributes$x2(
-									_elm_lang$core$Basics$toString(edge.second.pos.x)),
+								_0: _elm_lang$svg$Svg_Attributes$y2(
+									_elm_lang$core$Basics$toString(edge.second.pos.y)),
 								_1: {
 									ctor: '::',
-									_0: _elm_lang$svg$Svg_Attributes$y2(
-										_elm_lang$core$Basics$toString(edge.second.pos.y)),
+									_0: _elm_lang$svg$Svg_Attributes$stroke(color),
+									_1: {
+										ctor: '::',
+										_0: _elm_lang$svg$Svg_Attributes$strokeWidth(
+											_elm_lang$core$Basics$toString(width)),
+										_1: {ctor: '[]'}
+									}
+								}
+							}
+						}
+					}
+				},
+				{ctor: '[]'}),
+			_1: {
+				ctor: '::',
+				_0: A2(
+					_elm_lang$svg$Svg$circle,
+					{
+						ctor: '::',
+						_0: _elm_lang$svg$Svg_Attributes$cx(
+							_elm_lang$core$Basics$toString(center.x)),
+						_1: {
+							ctor: '::',
+							_0: _elm_lang$svg$Svg_Attributes$cy(
+								_elm_lang$core$Basics$toString(center.y)),
+							_1: {
+								ctor: '::',
+								_0: _elm_lang$svg$Svg_Attributes$r('12'),
+								_1: {
+									ctor: '::',
+									_0: _elm_lang$svg$Svg_Attributes$fill('white'),
 									_1: {
 										ctor: '::',
 										_0: _elm_lang$svg$Svg_Attributes$stroke('black'),
 										_1: {
 											ctor: '::',
-											_0: _elm_lang$svg$Svg_Attributes$strokeWidth(
-												_elm_lang$core$Basics$toString(width)),
+											_0: _elm_lang$svg$Svg_Attributes$strokeWidth('2'),
 											_1: {ctor: '[]'}
 										}
 									}
@@ -13052,69 +13070,37 @@ var _user$project$Network$viewEdge = F2(
 				_1: {
 					ctor: '::',
 					_0: A2(
-						_elm_lang$svg$Svg$circle,
+						_elm_lang$svg$Svg$text_,
 						{
 							ctor: '::',
-							_0: _elm_lang$svg$Svg_Attributes$cx(
+							_0: _elm_lang$svg$Svg_Attributes$x(
 								_elm_lang$core$Basics$toString(center.x)),
 							_1: {
 								ctor: '::',
-								_0: _elm_lang$svg$Svg_Attributes$cy(
-									_elm_lang$core$Basics$toString(center.y)),
+								_0: _elm_lang$svg$Svg_Attributes$y(
+									_elm_lang$core$Basics$toString(center.y + 1)),
 								_1: {
 									ctor: '::',
-									_0: _elm_lang$svg$Svg_Attributes$r('12'),
+									_0: _elm_lang$svg$Svg_Attributes$textAnchor('middle'),
 									_1: {
 										ctor: '::',
-										_0: _elm_lang$svg$Svg_Attributes$fill('white'),
-										_1: {
-											ctor: '::',
-											_0: _elm_lang$svg$Svg_Attributes$stroke('black'),
-											_1: {
-												ctor: '::',
-												_0: _elm_lang$svg$Svg_Attributes$strokeWidth('2'),
-												_1: {ctor: '[]'}
-											}
-										}
+										_0: _elm_lang$svg$Svg_Attributes$alignmentBaseline('middle'),
+										_1: {ctor: '[]'}
 									}
 								}
 							}
 						},
-						{ctor: '[]'}),
-					_1: {
-						ctor: '::',
-						_0: A2(
-							_elm_lang$svg$Svg$text_,
-							{
-								ctor: '::',
-								_0: _elm_lang$svg$Svg_Attributes$x(
-									_elm_lang$core$Basics$toString(center.x)),
-								_1: {
-									ctor: '::',
-									_0: _elm_lang$svg$Svg_Attributes$y(
-										_elm_lang$core$Basics$toString(center.y + 1)),
-									_1: {
-										ctor: '::',
-										_0: _elm_lang$svg$Svg_Attributes$textAnchor('middle'),
-										_1: {
-											ctor: '::',
-											_0: _elm_lang$svg$Svg_Attributes$alignmentBaseline('middle'),
-											_1: {ctor: '[]'}
-										}
-									}
-								}
-							},
-							{
-								ctor: '::',
-								_0: _elm_lang$svg$Svg$text(
-									_elm_lang$core$Basics$toString(edge.data.cost)),
-								_1: {ctor: '[]'}
-							}),
-						_1: {ctor: '[]'}
-					}
+						{
+							ctor: '::',
+							_0: _elm_lang$svg$Svg$text(
+								_elm_lang$core$Basics$toString(edge.data.cost)),
+							_1: {ctor: '[]'}
+						}),
+					_1: {ctor: '[]'}
 				}
-			});
-	});
+			}
+		});
+};
 var _user$project$Network$viewPoint = F2(
 	function (typ, point) {
 		var color = function () {
@@ -13315,15 +13301,18 @@ var _user$project$Network$sendMessages = F2(
 	});
 var _user$project$Network$markRouteHelper = F4(
 	function (start, end, time, sim) {
+		var clearTravels = _user$project$Graph$mapEdges(
+			function (edge) {
+				return _elm_lang$core$Native_Utils.update(
+					edge,
+					{travels: 0});
+			});
 		var markEdge = F3(
 			function (from, to, sim) {
 				var graph = A2(
 					_user$project$Graph$mapFullEdges,
 					function (edge) {
-						return ((_elm_lang$core$Native_Utils.eq(edge.first.id, from) && _elm_lang$core$Native_Utils.eq(edge.second.id, to)) || (_elm_lang$core$Native_Utils.eq(edge.first.id, to) && _elm_lang$core$Native_Utils.eq(edge.second.id, from))) ? {
-							cost: edge.data.cost,
-							lastTravel: _elm_lang$core$Maybe$Just(time)
-						} : edge.data;
+						return ((_elm_lang$core$Native_Utils.eq(edge.first.id, from) && _elm_lang$core$Native_Utils.eq(edge.second.id, to)) || (_elm_lang$core$Native_Utils.eq(edge.first.id, to) && _elm_lang$core$Native_Utils.eq(edge.second.id, from))) ? {cost: edge.data.cost, travels: edge.data.travels + 1} : edge.data;
 					},
 					sim.network);
 				return _elm_lang$core$Native_Utils.update(
@@ -13372,7 +13361,16 @@ var _user$project$Network$markRouteHelper = F4(
 								_elm_lang$core$Maybe$Just(sim))));
 				}
 			});
-		return A4(mark, start, end, 10, sim);
+		return A4(
+			mark,
+			start,
+			end,
+			10,
+			_elm_lang$core$Native_Utils.update(
+				sim,
+				{
+					network: clearTravels(sim.network)
+				}));
 	});
 var _user$project$Network$updateEdgeHelper = F4(
 	function (id1, id2, cost, sim) {
@@ -13400,7 +13398,7 @@ var _user$project$Network$updateEdgeHelper = F4(
 				function (n) {
 					return _elm_lang$core$Native_Utils.eq(n.id, id2);
 				},
-				{cost: _p9._0, lastTravel: _elm_lang$core$Maybe$Nothing},
+				{cost: _p9._0, travels: 0},
 				withoutEdge);
 			return _elm_lang$core$Native_Utils.update(
 				sim,
@@ -13559,8 +13557,8 @@ var _user$project$Network$animate = F3(
 var _user$project$Network$Normal = {ctor: 'Normal'};
 var _user$project$Network$End = {ctor: 'End'};
 var _user$project$Network$Start = {ctor: 'Start'};
-var _user$project$Network$view = F5(
-	function (size, tick, start, end, sim) {
+var _user$project$Network$view = F4(
+	function (size, start, end, sim) {
 		var height = _elm_lang$core$Basics$toString(size.y);
 		var width = _elm_lang$core$Basics$toString(size.x);
 		var pickType = function (id) {
@@ -13577,7 +13575,7 @@ var _user$project$Network$view = F5(
 			_user$project$Graph$nodes(graph));
 		var edges = A2(
 			_elm_lang$core$List$map,
-			_user$project$Network$viewEdge(tick),
+			_user$project$Network$viewEdge,
 			_user$project$Graph$edges(graph));
 		var items = A2(_elm_lang$core$Basics_ops['++'], edges, points);
 		return A2(
@@ -13884,7 +13882,7 @@ var _user$project$Main$viewModel = function (model) {
 		_user$project$Point$Point,
 		_elm_lang$core$Basics$toFloat(model.width - 400),
 		_elm_lang$core$Basics$toFloat(model.height));
-	var network = A5(_user$project$Network$view, size, model.tick, model.start, model.end, model.simulation);
+	var network = A4(_user$project$Network$view, size, model.start, model.end, model.simulation);
 	return A2(
 		_elm_lang$html$Html$div,
 		{ctor: '[]'},
