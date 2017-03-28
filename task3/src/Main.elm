@@ -231,7 +231,7 @@ view model =
         "link"
         [ HtmlAttrib.attribute "rel" "stylesheet"
         , HtmlAttrib.attribute "property" "stylesheet"
-        , HtmlAttrib.attribute "href" "../style.css"
+        , HtmlAttrib.attribute "href" "style.css"
         ]
         []
   in
