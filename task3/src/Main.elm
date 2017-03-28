@@ -248,7 +248,7 @@ viewModel model =
 
     terminal = Terminal.view model.terminal
 
-    network = Network.view size model.tick model.start model.end model.simulation
+    network = Network.view size model.start model.end model.simulation
   in
     Html.div []
       [ Html.map Terminal terminal

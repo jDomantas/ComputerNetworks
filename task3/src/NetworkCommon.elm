@@ -15,7 +15,7 @@ type alias Message a =
 
 type alias EdgeData =
   { cost : Int
-  , lastTravel : Maybe Int
+  , travels : Int
   }
 
 
