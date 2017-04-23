@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 use bencode::{BValue, encode};
 
+#[derive(Clone)]
 pub struct Torrent {
 	pub tracker_url: String,
 	pub info: TorrentInfo,
 }
 
+#[derive(Clone)]
 pub struct TorrentInfo {
 	pub root: PathBuf,
 	pub piece_length: u64,
@@ -13,6 +15,7 @@ pub struct TorrentInfo {
 	pub files: Vec<File>,
 }
 
+#[derive(Clone)]
 pub struct File {
 	pub path: PathBuf,
 	pub length: u64,

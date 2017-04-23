@@ -1,4 +1,5 @@
 pub mod memory;
+pub mod partial;
 
 use torrent::TorrentInfo;
 use downloader::request::Request;
@@ -31,5 +32,9 @@ pub trait Storage {
 
 	fn is_complete(&self) -> bool {
 		self.bytes_missing() == 0
+	}
+
+	fn has_piece(&mut self, index: usize) -> bool {
+		self.get_piece(index).is_some()
 	}
 }

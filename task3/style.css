@@ -1,0 +1,50 @@
+body {
+	/*overflow: hidden;*/
+	margin: 0;
+	padding: 0;
+}
+
+svg {
+	user-select: none;
+	cursor: default;
+}
+
+.terminal p {
+	margin: 0;
+	line-height: 130%;
+}
+
+.terminal {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	/*height: 100%;
+	min-height: 100%;*/
+	width: 400px;
+	margin: 0;
+  padding: 5px;
+	overflow: auto;
+  font: 0.8em 'Andale Mono', Consolas, 'Courier New';
+	background: #eee;
+}
+
+.terminal input {
+  font: 1em 'Andale Mono', Consolas, 'Courier New';
+	width: 100%;
+	border: none;
+	outline-width: 0;
+	background: #ddd;
+}
+
+.graph {
+	position: fixed;
+	left: 400px;
+	right: 0;
+	top: 0;
+	bottom: 0;
+}
+
+svg {
+	width: 100%;
+}

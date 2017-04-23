@@ -152,11 +152,9 @@ impl<S: Storage> Downloader<S> {
 
 		let requests = self.storage
 			.requests()
-			// because we only store prefixes of pieces,
-			// take at most one request from each piece
-			.filter_map(|r| r.split_request(REQUEST_SIZE).next())
+			.flat_map(|r| r.split_request(REQUEST_SIZE))
 			// TODO: figure out how many
-			.take(40)
+			.take(100)
 			.collect::<Vec<_>>();
 
 		for r in requests {

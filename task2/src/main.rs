@@ -15,11 +15,12 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::env;
-use log::{LogRecord, LogLevel, LogMetadata, LogLevelFilter, SetLoggerError};
+use log::{LogRecord, LogLevel, LogMetadata, SetLoggerError};
 
 use torrent::Torrent;
 use downloader::Downloader;
 use storage::memory::MemoryStorage;
+use storage::partial::PartialStorage;
 
 fn main() {
     Logger::init().expect("Failed to initialize logger");
@@ -40,12 +41,11 @@ fn main() {
     println!("Parsed file!");
     println!("Downloading: {:?}", torrent.info.root);
     
-    let mut downloader: Downloader<MemoryStorage> =
-        Downloader::new(info_hash, torrent);
+    let mut downloader: Downloader<PartialStorage<MemoryStorage>> =
+        Downloader::new(info_hash, torrent.clone());
 
     downloader.run();
 
-    let (torrent, _) = read_torrent_file(path).unwrap();
     println!("splitting");
     split_to_files("./test.out", torrent);
 }
@@ -108,7 +108,7 @@ impl log::Log for Logger {
 impl Logger {
     fn init() -> Result<(), SetLoggerError> {
         log::set_logger(|max_log_level| {
-            max_log_level.set(LogLevelFilter::Trace);
+            max_log_level.set(LOGGING_LEVEL.to_log_level_filter());
             Box::new(Logger)
         })
     }
