@@ -44,6 +44,8 @@ main = Html.program
 init : (Model, Cmd Msg)
 init =
   let
+    terminal = writeHelp Terminal.init
+
     model =
       { width = 600
       , height = 100
@@ -52,7 +54,7 @@ init =
       , start = Nothing
       , end = Nothing
       , simulation = Network.distanceVector
-      , terminal = Terminal.init
+      , terminal = terminal
       }
 
     tasks = Cmd.batch
@@ -86,6 +88,28 @@ subscriptions _ =
     [ Window.resizes (\size -> UpdateSize (Just size.width) (Just size.height))
     , Time.every (Time.second / 60.0) (always Tick)
     ]
+
+
+writeHelp : Terminal.Model -> Terminal.Model
+writeHelp terminal =
+  terminal
+  |> Terminal.write "Commands:"
+  |> Terminal.write " help"
+  |> Terminal.write "   shows this list"
+  |> Terminal.write " add <node>"
+  |> Terminal.write "   adds node named <node>"
+  |> Terminal.write " remove <node>"
+  |> Terminal.write "   removes node named <node>"
+  |> Terminal.write " start <node>"
+  |> Terminal.write "   sets start node to <node>"
+  |> Terminal.write " end <node>"
+  |> Terminal.write "   sets end node to <node>"
+  |> Terminal.write " edge <a> <b>"
+  |> Terminal.write "   removes edge between nodes <a> and <b>"
+  |> Terminal.write " edge <a> <b> <weight>"
+  |> Terminal.write "   adds edge between nodes <a> and <b>, with weight <weight>"
+  |> Terminal.write " view <node>"
+  |> Terminal.write "   shows routing table for <node>"
 
 
 applyCommand : String -> Model -> Model
@@ -142,6 +166,9 @@ applyCommand cmd model =
           List.foldl (\line term -> Terminal.write line term) model.terminal data
       in
         { model | terminal = term }
+
+    Ok Command.Help ->
+      { model | terminal = writeHelp model.terminal }
 
     Ok cmd ->
       let

@@ -14,6 +14,7 @@ type Command
   | SetEnd String
   | ViewNode String
   | Clear
+  | Help
 
 
 parse : String -> Result String Command
@@ -45,6 +46,7 @@ command =
     , setEnd
     , viewNode
     , clear
+    , help
     ]
 
 
@@ -96,6 +98,12 @@ clear : Parser Command
 clear =
   Parser.succeed Clear
   |. Parser.symbol "clear"
+
+
+help : Parser Command
+help =
+  Parser.succeed Clear
+  |. Parser.symbol "help"
 
 
 spaces : Parser ()

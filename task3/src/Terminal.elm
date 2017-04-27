@@ -34,6 +34,7 @@ update msg model =
     Enter ->
       ({ model | input = "" }, Just model.input)
 
+
 write : String -> Model -> Model
 write line model =
   let
