@@ -12084,11 +12084,16 @@ var _user$project$Command$withNameArg = F2(
 				_user$project$Command$spaces),
 			_user$project$Command$name);
 	});
+var _user$project$Command$Help = {ctor: 'Help'};
 var _user$project$Command$Clear = {ctor: 'Clear'};
 var _user$project$Command$clear = A2(
 	_elm_tools$parser$Parser_ops['|.'],
 	_elm_tools$parser$Parser$succeed(_user$project$Command$Clear),
 	_elm_tools$parser$Parser$symbol('clear'));
+var _user$project$Command$help = A2(
+	_elm_tools$parser$Parser_ops['|.'],
+	_elm_tools$parser$Parser$succeed(_user$project$Command$Clear),
+	_elm_tools$parser$Parser$symbol('help'));
 var _user$project$Command$ViewNode = function (a) {
 	return {ctor: 'ViewNode', _0: a};
 };
@@ -12169,7 +12174,11 @@ var _user$project$Command$command = _elm_tools$parser$Parser$oneOf(
 							_1: {
 								ctor: '::',
 								_0: _user$project$Command$clear,
-								_1: {ctor: '[]'}
+								_1: {
+									ctor: '::',
+									_0: _user$project$Command$help,
+									_1: {ctor: '[]'}
+								}
 							}
 						}
 					}
@@ -13730,6 +13739,57 @@ var _user$project$Terminal$view = function (model) {
 			}
 		});
 };
+var _user$project$Main$writeHelp = function (terminal) {
+	return A2(
+		_user$project$Terminal$write,
+		'   shows routing table for <node>',
+		A2(
+			_user$project$Terminal$write,
+			' view <node>',
+			A2(
+				_user$project$Terminal$write,
+				'   adds edge between nodes <a> and <b>, with weight <weight>',
+				A2(
+					_user$project$Terminal$write,
+					' edge <a> <b> <weight>',
+					A2(
+						_user$project$Terminal$write,
+						'   removes edge between nodes <a> and <b>',
+						A2(
+							_user$project$Terminal$write,
+							' edge <a> <b>',
+							A2(
+								_user$project$Terminal$write,
+								'   sets end node to <node>',
+								A2(
+									_user$project$Terminal$write,
+									' end <node>',
+									A2(
+										_user$project$Terminal$write,
+										'   sets start node to <node>',
+										A2(
+											_user$project$Terminal$write,
+											' start <node>',
+											A2(
+												_user$project$Terminal$write,
+												'   removes node named <node>',
+												A2(
+													_user$project$Terminal$write,
+													' remove <node>',
+													A2(
+														_user$project$Terminal$write,
+														'   adds node named <node>',
+														A2(
+															_user$project$Terminal$write,
+															' add <node>',
+															A2(
+																_user$project$Terminal$write,
+																'   shows this list',
+																A2(
+																	_user$project$Terminal$write,
+																	' help',
+																	A2(_user$project$Terminal$write, 'Commands:', terminal)))))))))))))))));
+};
 var _user$project$Main$applyCommand = F2(
 	function (cmd, model) {
 		var _p0 = _user$project$Command$parse(cmd);
@@ -13848,6 +13908,12 @@ var _user$project$Main$applyCommand = F2(
 					return _elm_lang$core$Native_Utils.update(
 						model,
 						{terminal: term});
+				case 'Help':
+					return _elm_lang$core$Native_Utils.update(
+						model,
+						{
+							terminal: _user$project$Main$writeHelp(model.terminal)
+						});
 				default:
 					var msg = A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -14092,7 +14158,8 @@ var _user$project$Main$init = function () {
 				}
 			}
 		});
-	var model = {width: 600, height: 100, tick: 0, tickProgress: 0, start: _elm_lang$core$Maybe$Nothing, end: _elm_lang$core$Maybe$Nothing, simulation: _user$project$Network$distanceVector, terminal: _user$project$Terminal$init};
+	var terminal = _user$project$Main$writeHelp(_user$project$Terminal$init);
+	var model = {width: 600, height: 100, tick: 0, tickProgress: 0, start: _elm_lang$core$Maybe$Nothing, end: _elm_lang$core$Maybe$Nothing, simulation: _user$project$Network$distanceVector, terminal: terminal};
 	return {ctor: '_Tuple2', _0: model, _1: tasks};
 }();
 var _user$project$Main$subscriptions = function (_p13) {
